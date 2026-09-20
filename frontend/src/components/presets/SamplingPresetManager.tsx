@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
-import { Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
+import { Pencil, Plus, SlidersHorizontal, Trash2, Upload } from "lucide-react";
 import { useSamplingPresets } from "../../hooks/useSamplingPresets";
 import { useSettings } from "../../hooks/useSettings";
 import { useProviders } from "../../hooks/useProviders";
 import { useProviderModels } from "../../hooks/useProviderModels";
 import type { Effort, SamplingPreset } from "../../types/samplingPreset";
 import type { ProviderCapabilities } from "../../types/provider";
-import { Button, Card, Field, NumberSlider, PageHeader, Tabs, Toggle, inputClasses } from "../ui";
+import { Alert, Button, Card, Field, NumberSlider, PageHeader, Tabs, Toggle, inputClasses } from "../ui";
 import { ModelSelect } from "../settings/ModelSelect";
 import { ProviderConnectionPanel } from "../settings/ProviderConnectionPanel";
 import { useT } from "../../i18n";
@@ -131,7 +132,7 @@ function formToFields(form: FormState): Omit<SamplingPreset, "id"> {
 
 export function SamplingPresetManager() {
   const t = useT();
-  const { presets, create, update, remove } = useSamplingPresets();
+  const { presets, create, update, remove, importFile } = useSamplingPresets();
   const { settings, update: updateSettings } = useSettings();
   const { active } = useProviders();
   const { models } = useProviderModels(active?.id ?? null, active?.baseUrl);
@@ -139,6 +140,9 @@ export function SamplingPresetManager() {
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formTab, setFormTab] = useState("sampling");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const capabilities = active?.capabilities ?? null;
   const visibleNumeric = useMemo(
@@ -181,6 +185,37 @@ export function SamplingPresetManager() {
   async function handleSetActive(id: string) {
     if (!settings) return;
     await updateSettings({ ...settings, activeSamplingPresetId: id });
+  }
+
+  /**
+   * Reads a preset JSON file and sends it to the backend, which accepts both Pliego presets and
+   * SillyTavern completion presets. The file name is the fallback name, since ST presets usually
+   * carry no name inside the JSON.
+   */
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset so picking the same file again still fires a change event.
+    event.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const result = await importFile(file);
+      setImportResult({
+        ok: result.errors.length === 0,
+        message: result.errors.length
+          ? t("presets.manager.importWithErrors", { count: result.imported.length, errors: result.errors.join(" · ") })
+          : t("presets.manager.importSuccess", { count: result.imported.length }),
+      });
+    } catch (err) {
+      setImportResult({
+        ok: false,
+        message: err instanceof Error ? err.message : t("common.errors.preset.importInvalid"),
+      });
+    } finally {
+      setImporting(false);
+    }
   }
 
   const showForm = isCreating || !!editingId;
@@ -238,10 +273,29 @@ export function SamplingPresetManager() {
       </div>
 
       {!showForm && (
-        <Button variant="secondary" className="mt-4" onClick={startCreate}>
-          <Plus size={16} />
-          {t("presets.shared.newPreset")}
-        </Button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={startCreate}>
+            <Plus size={16} />
+            {t("presets.shared.newPreset")}
+          </Button>
+          <Button variant="secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            <Upload size={16} />
+            {importing ? t("presets.manager.importing") : t("presets.manager.importPreset")}
+          </Button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+        </div>
+      )}
+
+      {importResult && (
+        <div className="mt-3">
+          <Alert kind={importResult.ok ? "success" : "warning"}>{importResult.message}</Alert>
+        </div>
       )}
 
       {showForm && (

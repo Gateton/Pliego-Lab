@@ -32,6 +32,7 @@ export const common = {
     "chat.notFound": "No se encontró el chat.",
     "persona.notFound": "No se encontró la persona.",
     "preset.notFound": "No se encontró el preset de respuesta.",
+    "preset.importInvalid": "El archivo no contiene un preset válido (ni un preset de Pliego ni un preset de Chat Completion de SillyTavern).",
     "recast.disabled": "Recast está deshabilitado.",
     "recast.presetNotFound": "No se encontró el preset de Recast.",
     "comfy.disabled": "ComfyInject está deshabilitado.",

@@ -34,3 +34,16 @@ export async function deleteSamplingPreset(id: string): Promise<void> {
     throw await responseError(response);
   }
 }
+
+/**
+ * Imports one or more presets from a JSON file the user picked. `data` is the parsed file and
+ * `name` is the file name without extension, used when a preset carries no name of its own
+ * (SillyTavern completion presets usually do not).
+ */
+export function importSamplingPresets(name: string, data: unknown): Promise<{ imported: SamplingPreset[]; errors: string[] }> {
+  return fetch("/api/sampling-presets/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, data }),
+  }).then((r) => asJson<{ imported: SamplingPreset[]; errors: string[] }>(r));
+}

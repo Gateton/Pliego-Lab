@@ -307,7 +307,11 @@ function App() {
         }}
       />
 
-      <div className="app-workspace flex min-h-0 flex-1">
+      <div
+        className="app-workspace flex min-h-0 flex-1"
+        data-left-collapsed={String(leftCollapsed)}
+        data-right-collapsed={String(rightCollapsed)}
+      >
         {leftCollapsed ? (
           <CollapsedRail side="left" onExpand={() => setLeftCollapsed(false)} />
         ) : (

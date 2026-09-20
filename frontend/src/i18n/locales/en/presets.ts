@@ -81,6 +81,11 @@ export const presets = {
     noPrompts: "no prompts",
     modelHint: "Empty = default model of the active provider.",
     modelPlaceholder: "Provider model…",
+    importPreset: "Import preset",
+    importing: "Importing…",
+    importSuccess: "Imported: {count} presets.",
+    importWithErrors: "Imported: {count} presets. Errors: {errors}",
+    importInvalidJson: "The file is not valid JSON.",
     capabilitiesNotice: "Showing only the parameters that {provider} declares it supports.",
     tabs: {
       sampling: "Sampling",

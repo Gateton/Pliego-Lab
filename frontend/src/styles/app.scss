@@ -244,6 +244,9 @@ textarea {
 
 /* Chat stage */
 .chat-stage {
+  /* Reading column. It widens as side panels collapse so the conversation fills the freed space
+     instead of staying locked to a narrow centered strip. `.app-workspace` carries the state. */
+  --chat-column-max: 1200px;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -252,6 +255,16 @@ textarea {
     radial-gradient(circle at 50% 0, rgb(var(--sg-glow) / 0.045), transparent 24rem),
     rgb(var(--sg-stage) / 0.8);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+/* One panel collapsed: more room. Both collapsed: the whole stage. */
+.app-workspace[data-left-collapsed="true"] .chat-stage,
+.app-workspace[data-right-collapsed="true"] .chat-stage {
+  --chat-column-max: 1500px;
+}
+
+.app-workspace[data-left-collapsed="true"][data-right-collapsed="true"] .chat-stage {
+  --chat-column-max: 100%;
 }
 
 .chat-header {
@@ -318,7 +331,7 @@ textarea {
 }
 
 .chat-thread {
-  width: min(100%, 880px);
+  width: min(100%, var(--chat-column-max));
   min-height: 100%;
   margin: 0 auto;
 }
@@ -363,7 +376,7 @@ textarea {
 
 .message-row {
   position: relative;
-  width: min(100%, 830px);
+  width: 100%;
   margin-inline: auto;
   padding: 4px 6px;
   border-radius: 18px;
@@ -400,7 +413,9 @@ textarea {
 }
 
 .message-content {
-  max-width: 72ch;
+  /* No line-length cap: the message fills the column. The column itself is what adapts to the
+     available space (see --chat-column-max on .chat-stage). */
+  max-width: 100%;
   color: var(--color-text);
   text-wrap: pretty;
 
@@ -426,7 +441,7 @@ textarea {
 }
 
 .composer-card {
-  width: min(100%, 900px);
+  width: min(100%, var(--chat-column-max, 900px));
   margin: 0 auto;
   padding: 10px;
   border: 1px solid rgba(245, 240, 232, 0.1);

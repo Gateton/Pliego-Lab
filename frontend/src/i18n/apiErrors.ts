@@ -26,6 +26,7 @@ export const API_ERROR_KEYS: Record<string, TranslationKey> = {
   "chat.notFound": "common.errors.chat.notFound",
   "persona.notFound": "common.errors.persona.notFound",
   "preset.notFound": "common.errors.preset.notFound",
+  "preset.importInvalid": "common.errors.preset.importInvalid",
   "recast.disabled": "common.errors.recast.disabled",
   "recast.presetNotFound": "common.errors.recast.presetNotFound",
   "comfy.disabled": "common.errors.comfy.disabled",

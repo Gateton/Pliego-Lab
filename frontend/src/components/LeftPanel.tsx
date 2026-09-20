@@ -2,7 +2,8 @@ import { useSamplingPresets } from "../hooks/useSamplingPresets";
 import { useSettings } from "../hooks/useSettings";
 import { Field, inputClasses } from "./ui";
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronUp, Trash2, GripVertical } from "lucide-react";
+import type { ChangeEvent } from "react";
+import { ChevronDown, ChevronUp, Trash2, GripVertical, Upload } from "lucide-react";
 import type { PromptBlock, PromptBlockPosition, PromptBlockRole } from "../types/settings";
 import type { AppSettings } from "../types/settings";
 import { estimateTokens } from "../lib/contextBudget";
@@ -73,9 +74,12 @@ interface Props {
 export function LeftPanel({ onOpenSampling }: Props) {
   const t = useT();
   const { settings, update } = useSettings();
-  const { presets, update: updatePreset } = useSamplingPresets();
+  const { presets, update: updatePreset, importFile } = useSamplingPresets();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(saveTimer.current), []);
@@ -95,6 +99,30 @@ export function LeftPanel({ onOpenSampling }: Props) {
 
   async function setActivePreset(id: string | null) {
     await update({ ...s, activeSamplingPresetId: id });
+  }
+
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportMessage(null);
+    try {
+      const result = await importFile(file);
+      setImportMessage({
+        ok: result.errors.length === 0,
+        text: result.errors.length
+          ? t("presets.manager.importWithErrors", { count: result.imported.length, errors: result.errors.join(" · ") })
+          : t("presets.manager.importSuccess", { count: result.imported.length }),
+      });
+    } catch (err) {
+      setImportMessage({
+        ok: false,
+        text: err instanceof Error ? err.message : t("common.errors.preset.importInvalid"),
+      });
+    } finally {
+      setImporting(false);
+    }
   }
 
   function setOutputLanguage(lang: string) {
@@ -175,6 +203,18 @@ export function LeftPanel({ onOpenSampling }: Props) {
         <button onClick={onOpenSampling} className="mt-1.5 cursor-pointer text-xs text-accent transition-colors hover:text-accent-hover">
           {t("presets.panel.editPresets")}
         </button>
+        <button
+          onClick={() => importInputRef.current?.click()}
+          disabled={importing}
+          className="mt-1.5 ml-3 inline-flex cursor-pointer items-center gap-1 text-xs text-text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Upload size={12} />
+          {importing ? t("presets.manager.importing") : t("presets.manager.importPreset")}
+        </button>
+        <input ref={importInputRef} type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
+        {importMessage && (
+          <p className={`mt-1 text-[11px] ${importMessage.ok ? "text-success" : "text-warning"}`}>{importMessage.text}</p>
+        )}
         <div className="mt-2.5">
           <Field label={t("presets.panel.outputLanguage.label")} hint={t("presets.panel.outputLanguage.hint")}>
             <select value={s.outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)} className={inputClasses}>

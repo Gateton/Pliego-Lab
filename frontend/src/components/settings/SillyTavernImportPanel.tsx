@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Download, FolderSearch, Search } from "lucide-react";
 import { useT } from "../../i18n";
 import * as importApi from "../../api/sillyTavernImport";
+import { refreshSamplingPresets } from "../../hooks/useSamplingPresets";
 import type { ScanResult, ScannedPersona } from "../../types/sillyTavernImport";
 import { Alert, Button, Field, PageHeader, inputClasses } from "../ui";
 
@@ -88,6 +89,9 @@ export function SillyTavernImportPanel({ embedded = false }: { embedded?: boolea
       setSelectedPresets(new Set());
       setSelectedPersonas(new Set());
       setSelectedLorebooks(new Set());
+      // The Response panel on the left keeps its own preset list; refresh the shared store so the
+      // imported presets appear there immediately instead of after a reload.
+      if (res.importedPresets > 0) await refreshSamplingPresets();
     } catch (err) {
       setApplyResult({ ok: false, message: err instanceof Error ? err.message : t("settings.stImport.applyError") });
     } finally {

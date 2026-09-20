@@ -36,6 +36,7 @@ export const API_ERRORS = {
   "chat.notFound": "Chat not found.",
   "persona.notFound": "Persona not found.",
   "preset.notFound": "Sampling preset not found.",
+  "preset.importInvalid": "The file does not contain a valid preset (neither a Pliego preset nor a SillyTavern completion preset).",
 
   // Native features
   "recast.disabled": "Recast is disabled.",

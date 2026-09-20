@@ -32,6 +32,7 @@ export const common = {
     "chat.notFound": "Chat not found.",
     "persona.notFound": "Persona not found.",
     "preset.notFound": "Sampling preset not found.",
+    "preset.importInvalid": "The file does not contain a valid preset (neither a Pliego preset nor a SillyTavern completion preset).",
     "recast.disabled": "Recast is disabled.",
     "recast.presetNotFound": "Recast preset not found.",
     "comfy.disabled": "ComfyInject is disabled.",
