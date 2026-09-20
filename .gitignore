@@ -1,0 +1,18 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Runtime data and user content
+backend/data/*
+!backend/data/.gitkeep
+
+# Logs and local tooling
+*.log
+.DS_Store

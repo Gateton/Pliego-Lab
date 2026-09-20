@@ -1,0 +1,36 @@
+name: Bug report
+description: Reportá un problema reproducible en Pliego Lab.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No incluyas API keys, chats, personajes privados ni imágenes personales.
+  - type: textarea
+    id: description
+    attributes:
+      label: Qué ocurrió
+      description: Describí el comportamiento observado y el esperado.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: Incluí una secuencia mínima y datos anonimizados.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión o commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Entorno
+      description: Sistema operativo, Node.js y proveedor configurado.
+    validations:
+      required: true

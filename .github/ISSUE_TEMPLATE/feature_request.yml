@@ -1,0 +1,24 @@
+name: Feature request
+description: Proponé una mejora para Pliego Lab.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema o necesidad
+      description: Qué flujo querés mejorar y para quién.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Cómo imaginás la solución y qué alternativa consideraste.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Impacto
+      description: Indicá si afecta chat, memoria, personajes, lorebooks, Director, ComfyInject o datos existentes.

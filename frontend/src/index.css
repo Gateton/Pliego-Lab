@@ -1,0 +1,297 @@
+@import "tailwindcss";
+
+@theme {
+  /* Ink, paper and blush tones sampled from the project mark. */
+  --color-bg: #100f14;
+  --color-bg-elevated: #19171e;
+  --color-bg-elevated-2: #211e27;
+  --color-bg-hover: #2a2630;
+
+  --color-border: #312d37;
+  --color-border-strong: #49424f;
+
+  --color-text: #f2eee8;
+  --color-text-muted: #b8b0b3;
+  --color-text-faint: #817980;
+
+  --color-accent: #ee9d9f;
+  --color-accent-hover: #f3b0b1;
+  --color-accent-contrast: #211318;
+
+  --color-accent-2: #d7b781;
+
+  --color-family-blue: #8ca6b8;
+
+  --color-danger: #e47f82;
+  --color-danger-hover: #ed9698;
+  --color-success: #8fb699;
+  --color-warning: #d7b781;
+  --color-info: #8ca6b8;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Elevation */
+  --shadow-sm: 0 2px 8px rgb(7 5 9 / 0.22);
+  --shadow-md: 0 10px 30px rgb(7 5 9 / 0.32);
+  --shadow-lg: 0 28px 80px rgb(7 5 9 / 0.52);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+/* Theme palettes. Tailwind's semantic color utilities read these variables at runtime. */
+:root,
+:root[data-theme="gateton"] {
+  --sg-glow: 238 157 159;
+  --sg-body-start: #111017;
+  --sg-body-end: #0e0d12;
+  --sg-topbar: 15 14 20;
+  --sg-panel: 24 22 29;
+  --sg-stage: 14 13 18;
+}
+
+:root[data-theme="medianoche"] {
+  --color-bg: #080d17;
+  --color-bg-elevated: #101827;
+  --color-bg-elevated-2: #172338;
+  --color-bg-hover: #20304a;
+  --color-border: #273750;
+  --color-border-strong: #405877;
+  --color-text: #edf3f8;
+  --color-text-muted: #afbecd;
+  --color-text-faint: #72869b;
+  --color-accent: #7aa2d6;
+  --color-accent-hover: #91b5e2;
+  --color-accent-contrast: #08111d;
+  --color-accent-2: #a9c7e8;
+  --color-family-blue: #7aa2d6;
+  --color-danger: #d77982;
+  --color-success: #78ad94;
+  --color-warning: #d2ae72;
+  --color-info: #7aa2d6;
+  --sg-glow: 122 162 214;
+  --sg-body-start: #0a1220;
+  --sg-body-end: #060a12;
+  --sg-topbar: 8 14 24;
+  --sg-panel: 14 22 35;
+  --sg-stage: 8 13 23;
+}
+
+:root[data-theme="bosque"] {
+  --color-bg: #0c120f;
+  --color-bg-elevated: #141d18;
+  --color-bg-elevated-2: #1c2821;
+  --color-bg-hover: #26352c;
+  --color-border: #2d3c32;
+  --color-border-strong: #465b4c;
+  --color-text: #edf1ea;
+  --color-text-muted: #b2bdb2;
+  --color-text-faint: #78877b;
+  --color-accent: #8eae91;
+  --color-accent-hover: #a6c1a7;
+  --color-accent-contrast: #0c1710;
+  --color-accent-2: #c2a875;
+  --color-family-blue: #86a8aa;
+  --color-danger: #d47f78;
+  --color-success: #8eae91;
+  --color-warning: #c2a875;
+  --color-info: #86a8aa;
+  --sg-glow: 142 174 145;
+  --sg-body-start: #101812;
+  --sg-body-end: #09100c;
+  --sg-topbar: 11 18 14;
+  --sg-panel: 19 29 23;
+  --sg-stage: 11 18 14;
+}
+
+:root[data-theme="vino"] {
+  --color-bg: #160c10;
+  --color-bg-elevated: #211218;
+  --color-bg-elevated-2: #2d1921;
+  --color-bg-hover: #3a222b;
+  --color-border: #422832;
+  --color-border-strong: #64404b;
+  --color-text: #f5edeb;
+  --color-text-muted: #c5afb2;
+  --color-text-faint: #90767c;
+  --color-accent: #cf7f8e;
+  --color-accent-hover: #df96a2;
+  --color-accent-contrast: #241016;
+  --color-accent-2: #d5ad79;
+  --color-family-blue: #91a6ba;
+  --color-danger: #df766f;
+  --color-success: #8caf91;
+  --color-warning: #d5ad79;
+  --color-info: #91a6ba;
+  --sg-glow: 207 127 142;
+  --sg-body-start: #1a0e13;
+  --sg-body-end: #10080c;
+  --sg-topbar: 21 11 15;
+  --sg-panel: 33 18 24;
+  --sg-stage: 22 12 16;
+}
+
+:root[data-theme="ambar"] {
+  --color-bg: #15110c;
+  --color-bg-elevated: #201a12;
+  --color-bg-elevated-2: #2b2318;
+  --color-bg-hover: #382e20;
+  --color-border: #403526;
+  --color-border-strong: #60503a;
+  --color-text: #f3eee5;
+  --color-text-muted: #c0b5a4;
+  --color-text-faint: #897c69;
+  --color-accent: #d49a61;
+  --color-accent-hover: #dfad78;
+  --color-accent-contrast: #26170a;
+  --color-accent-2: #e0c28d;
+  --color-family-blue: #8da5ad;
+  --color-danger: #d77e6c;
+  --color-success: #92ae83;
+  --color-warning: #d4a35f;
+  --color-info: #8da5ad;
+  --sg-glow: 212 154 97;
+  --sg-body-start: #19140d;
+  --sg-body-end: #100c08;
+  --sg-topbar: 20 16 11;
+  --sg-panel: 31 25 17;
+  --sg-stage: 21 17 12;
+}
+
+:root[data-theme="papel"] {
+  --color-bg: #eee8de;
+  --color-bg-elevated: #f7f2ea;
+  --color-bg-elevated-2: #e6ddd1;
+  --color-bg-hover: #ddd1c2;
+  --color-border: #d0c3b4;
+  --color-border-strong: #ad9b88;
+  --color-text: #29231f;
+  --color-text-muted: #655c54;
+  --color-text-faint: #887d72;
+  --color-accent: #a95858;
+  --color-accent-hover: #914747;
+  --color-accent-contrast: #fff9f0;
+  --color-accent-2: #84672f;
+  --color-family-blue: #58798a;
+  --color-danger: #a84444;
+  --color-danger-hover: #913737;
+  --color-success: #54765d;
+  --color-warning: #84672f;
+  --color-info: #58798a;
+  --sg-glow: 169 88 88;
+  --sg-body-start: #f2ede5;
+  --sg-body-end: #e7dfd4;
+  --sg-topbar: 247 242 234;
+  --sg-panel: 247 242 234;
+  --sg-stage: 238 232 222;
+  --sg-grid: rgb(41 35 31 / 0.035);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 650;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* Selection — terracotta tint */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+/* Slim, muted scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-faint);
+}
+
+/* Consistent, visible keyboard-focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-accent-2);
+  outline-offset: 2px;
+}
+
+/* Image Director — pulsing glow on the message being tagged */
+@keyframes director-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-accent-2) 40%, transparent),
+      0 0 12px color-mix(in srgb, var(--color-accent-2) 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--color-accent-2),
+      0 0 30px color-mix(in srgb, var(--color-accent-2) 60%, transparent);
+  }
+}
+
+.director-pulse {
+  animation: director-pulse 1.4s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Turn event pills (new NPC / evolution / visual state) — soft fade-in, then they stay put */
+@keyframes turn-event-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.turn-event {
+  animation: turn-event-in 0.4s ease-out;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,340 @@
+/**
+ * English catalog for Configuración and the themes. Same keys as the Spanish file, same structure,
+ * different values: neutral international English, US spelling, not a literal translation.
+ *
+ * Module names (Recast, ComfyInject, Living Memory, SillyTavern, Lorebooks, Personas, Presets) and
+ * technical names (Base URL, API key, Auto-run, Resolution lock, LoRAs, Sampler) read the same in
+ * both languages: they are the name of the thing, not a description of it. ComfyUI tokens
+ * (`RANDOM`, `MEDIUM`, `SQUARE`) travel to the API and are never translated.
+ */
+export const settings = {
+  language: {
+    title: "Language",
+    description: "Pick the interface language. It applies instantly and stays saved in this browser.",
+    groupLabel: "Interface language",
+    option: {
+      es: "The whole interface in Spanish.",
+      en: "The whole interface in English.",
+    },
+    active: "Active language",
+  },
+  shared: {
+    enabled: "Enabled",
+    none: "None",
+  },
+  themes: {
+    title: "Themes",
+    description: "Pick the mood of the interface. It applies instantly and stays saved in this browser.",
+    gridLabel: "Interface theme",
+    item: {
+      gateton: {
+        name: "Gateton",
+        description: "Ink, paper and dusty rose. The original look.",
+      },
+      medianoche: {
+        name: "Midnight",
+        description: "Deep blues with night-sky accents.",
+      },
+      bosque: {
+        name: "Forest",
+        description: "Muted greens, moss and damp wood.",
+      },
+      vino: {
+        name: "Wine",
+        description: "Dark burgundy with warm, theatrical touches.",
+      },
+      ambar: {
+        name: "Amber",
+        description: "Warm charcoal, copper and desk light.",
+      },
+      papel: {
+        name: "Paper",
+        description: "A light, soft, editorial mode for reading during the day.",
+      },
+    },
+  },
+  providers: {
+    title: "AI provider",
+    description:
+      "The active provider is used for every generation (chat, Director, Recast, NPCs, memory). API keys are stored only on the backend and never sent back to the browser.",
+    loading: "Loading providers…",
+    loadFailed: "No provider could be loaded.",
+    fetchFailed: "The providers could not be loaded",
+    modelsFailed: "The model list could not be fetched",
+    active: "Active provider",
+    baseUrl: "Base URL",
+    baseUrlDefault: "Default: {url}",
+    baseUrlOverride: "Replaces the default ({url}). Do not include /chat/completions.",
+    saveBaseUrl: "Save Base URL",
+    restoreDefault: "Restore default",
+    apiKey: "API key",
+    keyFromEnv: "Set from the environment ({hint}). Save one here to replace it.",
+    keyStored: "Saved ({hint}).",
+    keyMissing: "Not set — this provider needs it.",
+    keyOptional: "Optional — this provider does not need an API key.",
+    replaceKey: "Replace key…",
+    pasteKey: "Paste the API key…",
+    saveKey: "Save key",
+    deleteKey: "Delete key",
+    test: "Test connection",
+    testing: "Testing…",
+    testReplied: 'Replied: "{reply}"',
+    unknownError: "Unknown error",
+    backendUnreachable: "Could not reach the backend.",
+    testNote: "Testing the connection sends a real, short message to {provider} — it may use credit.",
+  },
+  models: {
+    sortAlpha: "Sort: alphabetical",
+    sortPrice: "Sort: cheapest first",
+    sortContext: "Sort: most context first",
+    groupByVendor: "Group by provider",
+    searchPlaceholder: "Search model…",
+    noResults: "No results. Type the model ID.",
+    enterToUse: "Enter to use «{query}»",
+    free: "Free",
+    pricePerMillion: "${price}/1M tok",
+    contextK: "{tokens}k ctx",
+    contextTokens: "{tokens} ctx",
+  },
+  recast: {
+    title: "Recast",
+    description:
+      "Polishes the model's prose after it is generated, through a chain of passes (each with its own prompt and model). You review the change in the chat and accept or reject it.",
+    presetMissing:
+      "The active Recast preset no longer exists (it was deleted). Pick a new one below to get Recast working again.",
+    enabledNoPreset: "⚠️ Pick an active preset with passes.",
+    enabledHint: "Runs after every model reply.",
+    autoRun: "Auto-run",
+    autoRunHint:
+      "Turn it off so Recast does NOT run on its own: use the 'Recast' button on each message to polish only the ones you want.",
+    activePreset: "Active preset",
+    activePresetHint: '{active} of {total} passes active in "{name}".',
+    activePresetEmpty: "Which chain of passes to use for polishing the text.",
+    minChars: "Minimum characters to process",
+    minCharsHint: "Messages shorter than this do not go through Recast.",
+    sceneContextAsRoles: "Send the history as separate role messages",
+    sceneContextAsRolesHint: "Instead of a single block of plain text.",
+  },
+  memory: {
+    title: "Living Memory",
+    description:
+      "Every chat compiles a continuity brief — scene, canon with evidence, open threads and who knows what — and injects it before the history. It learns from the turn in the background, without blocking the reply.",
+    experimental: "Experimental",
+    mayFail: "May fail",
+    warning:
+      "This is a new feature and still in development. Automatic extraction can store wrong things, flag too many open threads or skip important moments. It is enabled per chat and can be turned off at any time from its panel: once off, the conversation works exactly as before.",
+    whatYouRemember: "What you remember and where to see it",
+    list: {
+      now: {
+        label: "Now:",
+        text: "scene, moment, who is present and the immediate goal.",
+      },
+      canon: {
+        label: "Canon:",
+        text: "facts with their evidence and confidence.",
+      },
+      pending: {
+        label: "Open threads:",
+        text: "promises, secrets, threats and open plans.",
+      },
+      whoKnows: {
+        label: "Who knows what:",
+        text: "which character knows each fact.",
+      },
+      timeline: {
+        label: "Timeline and Revisions:",
+        text: "what changed and how to revert it.",
+      },
+      usedInTurn: {
+        label: "Used last turn:",
+        text: "exactly what the model received and why.",
+      },
+    },
+    perChat: {
+      title: "Per-chat settings",
+      bodyPrefix:
+        "The extraction mode, the extractor model, the limits, the brief budget, semantic retrieval, the shared scope and visual deduplication are set in the",
+      settingsTab: "Settings",
+      bodySuffix: "tab of the panel, because each conversation keeps its own memory.",
+    },
+    openPanel: "Open the chat memory panel",
+    noChat:
+      'Open a chat and you will be able to reach the panel from here or from the "Memory" button in the header.',
+    auto: {
+      title: "How it turns itself on",
+      before: "Before every reply the brief is compiled and injected as the turn's memory.",
+      after: "After every reply new facts are extracted in the background.",
+      edits: "If you edit or delete a message, or switch variant, the memory that quoted that text is flagged for review.",
+      guard: "The Continuity Guard warns when a reply contradicts the canon; it never rewrites it on its own.",
+    },
+  },
+  stImport: {
+    title: "Import from SillyTavern",
+    description:
+      "Point at your SillyTavern install on disk and pick characters, lorebooks, presets and personas to bring over without touching the originals.",
+    folder: "SillyTavern folder",
+    folderHint: "The root of the install (the one that holds the data/ folder), not the data folder itself.",
+    folderPlaceholder: "/home/user/SillyTavern",
+    scan: "Scan",
+    scanning: "Scanning…",
+    scanError: "Scan failed",
+    user: "SillyTavern user",
+    charactersTitle: "Characters ({count})",
+    searchCharacter: "Search character…",
+    noResults: "No results.",
+    lorebooksTitle: "Lorebooks ({count})",
+    entryCount: "{count} entries",
+    noLorebooks: "No lorebooks found.",
+    presetsTitle: "Response presets ({count})",
+    noPresets: "No presets found.",
+    personasTitle: "Personas ({count})",
+    noPersonas: "No personas found.",
+    selectAll: "Select all",
+    selectedCount: "{count} selected",
+    apply: "Import selected ({count})",
+    applying: "Importing…",
+    applyError: "Import failed",
+    imported: "Imported: {summary}.",
+    importedWithErrors: "Imported: {summary}. {count} error(s): {errors}",
+    importedCharacters: "{count} characters",
+    importedPresets: "{count} presets",
+    importedPersonas: "{count} personas",
+    importedLorebooks: "{count} lorebooks",
+  },
+  comfy: {
+    title: "ComfyInject",
+    description: "Generates images in ComfyUI when the model writes an [[IMG:...]] marker in its reply.",
+    enabledHint: "When it is off, [[IMG:...]] markers show up as plain text and generate nothing.",
+    tabs: {
+      general: "General",
+      prompts: "Prompts & Sampler",
+      tags: "Shot tags & LoRAs",
+      locks: "Locks",
+      presets: "Styles",
+      test: "Try it",
+    },
+    general: {
+      host: "ComfyUI host",
+      hostHint: "URL where your ComfyUI instance runs, e.g. http://127.0.0.1:8188",
+      checkpoint: "Checkpoint",
+      checkpointHint: "The base model to use. Start typing to see suggestions.",
+      workflow: "Workflow",
+      diffusionModel: "Diffusion model",
+      diffusionModelHint:
+        "The DiT model (UNETLoader) — for Krea 2 it goes in models/diffusion_models/. Start typing to see suggestions.",
+      textEncoder: "Text encoder",
+      textEncoderHint: "The text encoder (CLIPLoader) — for Krea 2 it goes in models/text_encoders/.",
+      vae: "VAE",
+      vaeHint: "The VAE (VAELoader) — for Krea 2 it goes in models/vae/.",
+      maxPollAttempts: "Max poll attempts",
+      maxPollAttemptsHint: "How many times it retries checking for the result before giving up.",
+    },
+    prompts: {
+      baseTitle: "Base prompt",
+      baseDescription: "The instructions and prompts sent to the model and to the generator.",
+      directive: "Directive for the model",
+      directiveHint:
+        "This is the only thing on this screen the MODEL sees — it explains the [[IMG: tags | AR | SHOT | SEED]] format so it knows how to write markers. It is sent whenever ComfyInject is enabled, no matter which response preset you have active. By default we use a generic directive built from your configured shot tags; turn the switch on to replace it with your own (for example, if you already have more detailed rules from a SillyTavern preset).",
+      useCustomDirective: "Use your own directive",
+      customDirectivePlaceholder:
+        "Write here the instructions the model will read to generate [[IMG:...]] markers.",
+      enhancer: "Tag enhancer",
+      enhancerHint:
+        "Enriches every prompt before generating: removes repeated tags, adds the quality ladder if it is missing and derives the lighting from the scene's mood. These are local rules (no LLM) and they do not change the workflow.",
+      enhancePrompts: "Enrich prompts automatically",
+      directorMode: "Director Mode",
+      directorModeHint:
+        "While it is on, the main model does NOT generate image tags. Only the Image Director (in Gateton-Roleplay) inserts tags. ComfyInject still renders them as usual.",
+      directorToggle: "Let the Director handle the images",
+      negativePrompt: "Negative prompt",
+      negativePromptHint: "What you do not want to show up in the image.",
+      prependPrompt: "Prepend prompt",
+      prependPromptHint: "Added at the start of every image prompt.",
+      appendPrompt: "Append prompt",
+      appendPromptHint: "Added at the end of every image prompt.",
+    },
+    sampler: {
+      title: "Sampler",
+      description: "Image generation parameters.",
+      steps: "Steps",
+      cfg: "CFG",
+      denoise: "Denoise",
+      scheduler: "Scheduler",
+    },
+    resolutions: {
+      title: "Resolutions",
+      description: "Dimensions for each aspect ratio.",
+      label: "Resolutions per aspect ratio",
+    },
+    tags: {
+      shotTags: "Shot tags",
+      shotTagsHint:
+        "Framing keywords the model can use inside [[IMG:...]] — each one maps to this text in the final prompt.",
+      loras: "LoRAs",
+      lorasHint:
+        "They are applied whenever ComfyInject generates an image. The workflow chosen in General decides how many are actually used (each one has a fixed number of chained LoRA nodes) — adding more rows here than the workflow supports does nothing.",
+      name: "Name",
+      removeRow: "Remove this row",
+      removeLora: "Remove LoRA",
+      empty: "No LoRAs configured.",
+      add: "+ Add LoRA",
+      strengthModel: "strength_model",
+      strengthClip: "strength_clip",
+    },
+    locks: {
+      intro:
+        "Locks force a fixed value instead of letting the model or the marker decide — handy for keeping a consistent look across images of the same scene.",
+      resolution: "Resolution lock",
+      shot: "Shot lock",
+      seed: "Seed lock",
+      seedMode: {
+        random: "RANDOM",
+        lock: "LOCK",
+        custom: "CUSTOM",
+      },
+    },
+    presets: {
+      active: "Active style",
+      activeHint:
+        "Picking one copies its values into the Checkpoint/Sampler/LoRAs fields of the other tabs — what you see there is always what will be generated. 'None' leaves whatever you set yourself.",
+      none: "None (base values)",
+      saveTitle: "Save current settings as a style",
+      saveHint:
+        "Takes what you have in the other tabs (checkpoint, LoRAs, sampler, prompts) and saves it under a name. If the name already exists, it overwrites it.",
+      namePlaceholder: "Style name",
+      empty: "No saved styles yet.",
+      editTitle: "Edit (loads its values into the other tabs — saving with the same name updates it)",
+      editStyle: "Edit style",
+      deleteStyle: "Delete style",
+    },
+    test: {
+      intro:
+        'Generates an image straight away, without going through any chat — it uses the SAME real generation path, so if you have an "Active style" under Styles, it applies here too, exactly like in a real chat.',
+      prompt: "Prompt (tags)",
+      promptPlaceholder: "1girl, silver hair, violet eyes, smiling…",
+      ar: "AR",
+      shot: "Shot",
+      seed: "Seed (empty = random)",
+      seedPlaceholder: "RANDOM",
+      customResolution: "Custom resolution (optional)",
+      customResolutionHint:
+        "If you fill in both, this exact resolution is used instead of the one configured for the chosen AR (and it also ignores the resolution lock, if you have one).",
+      width: "width",
+      height: "height",
+      clear: "clear",
+      generate: "Generate",
+      generating: "Generating…",
+      error: "Generation failed",
+      resultAlt: "Test result",
+      usedTitle: "What was actually used",
+      activePreset: "Active style:",
+      checkpoint: "Checkpoint:",
+      samplerScheduler: "Sampler / Scheduler:",
+      loras: "LoRAs:",
+      seedLabel: "Seed:",
+      arShot: "AR / Shot:",
+      resolution: "Resolution:",
+      finalPrompt: "Final prompt",
+    },
+  },
+};
