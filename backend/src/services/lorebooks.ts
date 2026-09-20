@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { CharacterCard, Chat, Persona } from "../types.js";
+import { dataDir } from "./paths.js";
 
 export type LorebookPosition = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -108,7 +109,7 @@ export interface LorebookScanResult {
   overflowed: boolean;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
+const DATA_DIR = dataDir();
 const BOOKS_FILE = path.join(DATA_DIR, "lorebooks.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "lorebookSettings.json");
 let queue: Promise<void> = Promise.resolve();

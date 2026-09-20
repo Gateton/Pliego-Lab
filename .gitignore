@@ -13,6 +13,15 @@ dist/
 backend/data/*
 !backend/data/.gitkeep
 
+# Local maintainer notes (never published)
+CLAUDE.md
+findings.md
+progress.md
+task_plan.md
+UI_REFACTOR_PLAN.md
+ONBOARDING_GUIDE_PROMPT.md
+REBRANDING_PROMPT.md
+
 # Logs and local tooling
 *.log
 .DS_Store

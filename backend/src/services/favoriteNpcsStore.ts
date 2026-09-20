@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { NpcRecord } from "../types.js";
+import { dataPath } from "./paths.js";
 
-const FILE_PATH = path.resolve(process.cwd(), "data", "favoriteNpcs.json");
+const FILE_PATH = dataPath("favoriteNpcs.json");
 const dirReady = mkdir(path.dirname(FILE_PATH), { recursive: true });
 
 let writeQueue: Promise<void> = Promise.resolve();

@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataPath } from "../paths.js";
 import type { ActiveMemoryState, MemoryEpisode, MemoryFact, MemoryScope, MemoryThread } from "./types.js";
 
 /**
@@ -49,7 +50,7 @@ export interface SharedLedgerMerge {
 }
 
 export function createSharedLedgerStore(options: SharedLedgerStoreOptions = {}) {
-  const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data", "memory-shared");
+  const dataDir = options.dataDir ?? dataPath("memory-shared");
   const dirReady = mkdir(dataDir, { recursive: true });
 
   async function read(key: string): Promise<ActiveMemoryState | null> {

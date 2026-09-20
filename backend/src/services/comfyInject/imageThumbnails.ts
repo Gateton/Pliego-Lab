@@ -1,5 +1,5 @@
-import path from "node:path";
 import { createThumbnailCache, type Thumbnail } from "../thumbnailCache.js";
+import { dataPath } from "../paths.js";
 import { IMAGES_DIR } from "./imageCache.js";
 
 /**
@@ -10,7 +10,7 @@ import { IMAGES_DIR } from "./imageCache.js";
  * illustration, and it is meant to be read at full size.
  */
 
-const THUMBS_DIR = path.resolve(process.cwd(), "data", "thumbnails", "comfy-images");
+const THUMBS_DIR = dataPath("thumbnails", "comfy-images");
 
 /** Only UUID-named PNGs, the shape `cacheImage` writes, so a crafted name cannot walk out of the folder. */
 const SAFE_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png$/i;

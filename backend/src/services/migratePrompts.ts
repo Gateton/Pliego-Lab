@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { dataPath } from "./paths.js";
 
-const SETTINGS_PATH = path.resolve(process.cwd(), "data", "settings.json");
-const PRESETS_PATH = path.resolve(process.cwd(), "data", "samplingPresets.json");
+const SETTINGS_PATH = dataPath("settings.json");
+const PRESETS_PATH = dataPath("samplingPresets.json");
 
 async function readJson<T>(filePath: string): Promise<T | null> {
   try {

@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { dataPath } from "./paths.js";
 
 // One-time migration: generation/response settings used to live in settings.json (next to UI
 // prefs) while the sampling parameters lived per preset — two sources of truth for the same
 // request. They now belong to the preset (see SamplingPreset in types.ts). This copies the old
 // global values into every existing preset and, when there is no active preset to carry them,
 // seeds a "Default" preset from the old fallback model so behavior is preserved exactly.
-const SETTINGS_PATH = path.resolve(process.cwd(), "data", "settings.json");
-const PRESETS_PATH = path.resolve(process.cwd(), "data", "samplingPresets.json");
+const SETTINGS_PATH = dataPath("settings.json");
+const PRESETS_PATH = dataPath("samplingPresets.json");
 
 const LEGACY_KEYS = [
   "fallbackModel",

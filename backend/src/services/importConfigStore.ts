@@ -1,11 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataPath } from "./paths.js";
 
 export interface ImportConfig {
   sillyTavernPath: string | null;
 }
 
-const FILE_PATH = path.resolve(process.cwd(), "data", "importConfig.json");
+const FILE_PATH = dataPath("importConfig.json");
 const dirReady = mkdir(path.dirname(FILE_PATH), { recursive: true });
 
 const DEFAULT_CONFIG: ImportConfig = { sillyTavernPath: null };

@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Chat, ChatSummary } from "../types.js";
+import { dataPath } from "./paths.js";
 
-const DATA_DIR = path.resolve(process.cwd(), "data", "chats");
+const DATA_DIR = dataPath("chats");
 /**
  * Re-created on every use: the folder can disappear while the process is running (someone cleaning
  * the data directory by hand). A one-shot mkdir promise resolved at import time left every later

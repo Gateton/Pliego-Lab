@@ -4,6 +4,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
+import { dataPath } from "./paths.js";
 import type { ProviderId } from "./providers/types.js";
 
 interface SecretEntry {
@@ -12,7 +13,7 @@ interface SecretEntry {
 
 type SecretsFile = Partial<Record<ProviderId, SecretEntry>>;
 
-const FILE_PATH = path.resolve(process.cwd(), "data", "secrets.json");
+const FILE_PATH = dataPath("secrets.json");
 const dirReady = mkdir(path.dirname(FILE_PATH), { recursive: true });
 let writeQueue: Promise<void> = Promise.resolve();
 

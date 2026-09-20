@@ -1,12 +1,12 @@
 import { access } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import type { RecastPreset } from "../types.js";
 import { createJsonArrayStore } from "./jsonArrayStore.js";
 import { setActivePresetIdIfUnset } from "./recastSettingsStore.js";
 import { getSettings } from "./settingsStore.js";
+import { dataPath } from "./paths.js";
 
-const FILE_PATH = path.resolve(process.cwd(), "data", "recastPresets.json");
+const FILE_PATH = dataPath("recastPresets.json");
 const store = createJsonArrayStore<RecastPreset>("recastPresets.json");
 
 // Ported from comfyinject3.0's sibling extension recast-post-processing's

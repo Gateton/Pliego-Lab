@@ -1,5 +1,5 @@
-import path from "node:path";
 import { createThumbnailCache, type Thumbnail } from "./thumbnailCache.js";
+import { dataPath } from "./paths.js";
 
 /**
  * Thumbnails for the character library.
@@ -9,8 +9,8 @@ import { createThumbnailCache, type Thumbnail } from "./thumbnailCache.js";
  * here instead of pulling the whole card (see `thumbnailCache.ts` for the shared machinery).
  */
 
-export const CHARACTERS_DIR = path.resolve(process.cwd(), "data", "characters");
-const THUMBS_DIR = path.resolve(process.cwd(), "data", "thumbnails", "characters");
+export const CHARACTERS_DIR = dataPath("characters");
+const THUMBS_DIR = dataPath("thumbnails", "characters");
 
 export type CharacterThumbnail = Thumbnail;
 

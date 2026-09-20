@@ -4,8 +4,9 @@ import path from "node:path";
 import type { CharacterCard, CharacterSummary } from "../types.js";
 import { normalizeCardJson, toCardV2Json, type CharacterFields } from "./characterCard.js";
 import { readCharaChunk, writeCharaChunk } from "./pngCard.js";
+import { dataPath } from "./paths.js";
 
-const DATA_DIR = path.resolve(process.cwd(), "data", "characters");
+const DATA_DIR = dataPath("characters");
 const PLACEHOLDER_PATH = path.resolve(process.cwd(), "assets", "placeholder-character.png");
 const SYSTEM_CHARACTER_NAMES = new Set(["pliego lab guide"]);
 

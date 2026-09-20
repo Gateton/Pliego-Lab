@@ -1,9 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataPath } from "./paths.js";
 
 /** Generic CRUD over a single JSON array file, with atomic writes serialized through a queue. */
 export function createJsonArrayStore<T extends { id: string }>(fileName: string) {
-  const filePath = path.resolve(process.cwd(), "data", fileName);
+  const filePath = dataPath(fileName);
   const dirReady = mkdir(path.dirname(filePath), { recursive: true });
   let writeQueue: Promise<void> = Promise.resolve();
 

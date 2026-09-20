@@ -1,8 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AppSettings, PromptBlock } from "../types.js";
+import { dataPath } from "./paths.js";
 
-const FILE_PATH = path.resolve(process.cwd(), "data", "settings.json");
+const FILE_PATH = dataPath("settings.json");
 const dirReady = mkdir(path.dirname(FILE_PATH), { recursive: true });
 
 const DEFAULT_SETTINGS: AppSettings = {

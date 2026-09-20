@@ -1,10 +1,11 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataPath } from "./paths.js";
 
 /** Generic get/update over a single JSON object file (app-wide settings), with atomic writes
  * serialized through a queue. Mirrors createJsonArrayStore's pattern for list-shaped stores. */
 export function createJsonObjectStore<T>(fileName: string, defaults: T) {
-  const filePath = path.resolve(process.cwd(), "data", fileName);
+  const filePath = dataPath(fileName);
   const dirReady = mkdir(path.dirname(filePath), { recursive: true });
   let writeQueue: Promise<void> = Promise.resolve();
 

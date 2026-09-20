@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataPath } from "../paths.js";
 import {
   ACTIVE_MEMORY_VERSION,
   type ActiveMemorySettings,
@@ -129,7 +130,7 @@ export interface MemoryTransactionResult<T> {
 }
 
 export function createActiveMemoryStore(options: ActiveMemoryStoreOptions = {}) {
-  const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data", "memory");
+  const dataDir = options.dataDir ?? dataPath("memory");
   const now = options.now ?? Date.now;
   const idFactory = options.idFactory ?? randomUUID;
   const maxRevisions = options.maxRevisions ?? 50;

@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ComfyClientError } from "./comfyClient.js";
+import { dataPath } from "../paths.js";
 
-export const IMAGES_DIR = path.resolve(process.cwd(), "data", "comfy-images");
+export const IMAGES_DIR = dataPath("comfy-images");
 const dirReady = mkdir(IMAGES_DIR, { recursive: true });
 
 /** Downloads a ComfyUI-hosted image and caches it locally so it survives ComfyUI clearing its own output folder. */
