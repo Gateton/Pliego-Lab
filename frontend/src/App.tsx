@@ -102,6 +102,8 @@ function App() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalId>(null);
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
+  // "New character" opens a draft editor; the card only exists once the user saves it.
+  const [creatingCharacter, setCreatingCharacter] = useState(false);
   const [charactersVersion, setCharactersVersion] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = usePersistedBoolean("pl.leftPanelCollapsed", narrowViewport);
   const [rightCollapsed, setRightCollapsed] = usePersistedBoolean("pl.rightPanelCollapsed", narrowViewport);
@@ -285,6 +287,7 @@ function App() {
 
   function closeCharacterEditor() {
     setEditingCharacterId(null);
+    setCreatingCharacter(false);
     setCharactersVersion((v) => v + 1);
   }
 
@@ -364,6 +367,7 @@ function App() {
               onRename={rename}
               onDelete={handleDelete}
               onEditCharacter={setEditingCharacterId}
+              onNewCharacter={() => setCreatingCharacter(true)}
               onOpenPersonas={() => setModal("personas")}
               onCollapse={() => setRightCollapsed(true)}
             />
@@ -410,9 +414,13 @@ function App() {
         <GatetonRoleplay chat={chatState.chat} onClose={() => setModal(null)} />
       )}
 
-      {editingCharacterId && (
-        <Modal title={t("chrome.library.editCharacter")} onClose={closeCharacterEditor} size="lg">
-          <CharacterEditor characterId={editingCharacterId} onClose={closeCharacterEditor} />
+      {(editingCharacterId || creatingCharacter) && (
+        <Modal
+          title={editingCharacterId ? t("chrome.library.editCharacter") : t("chrome.library.newCharacter")}
+          onClose={closeCharacterEditor}
+          size="lg"
+        >
+          <CharacterEditor key={editingCharacterId ?? "draft"} characterId={editingCharacterId} onClose={closeCharacterEditor} />
         </Modal>
       )}
 

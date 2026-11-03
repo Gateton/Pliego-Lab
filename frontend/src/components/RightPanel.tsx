@@ -18,6 +18,8 @@ interface Props {
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onEditCharacter: (id: string) => void;
+  /** Opens the editor on an unsaved draft: nothing is created until the user saves. */
+  onNewCharacter: () => void;
   onOpenPersonas: () => void;
   onCollapse: () => void;
   width: number;
@@ -32,6 +34,7 @@ export function RightPanel({
   onRename,
   onDelete,
   onEditCharacter,
+  onNewCharacter,
   onOpenPersonas,
   onCollapse,
   width,
@@ -89,10 +92,8 @@ export function RightPanel({
     return expanded.has(c.id) || chatsFor(c.id).some((ch) => ch.id === activeChatId);
   }
 
-  async function handleCreate() {
-    const card = await charactersApi.createCharacter({ name: t("chrome.library.newCharacter") });
-    await refresh();
-    onEditCharacter(card.id);
+  function handleCreate() {
+    onNewCharacter();
   }
 
   async function handleImport(file: File, kind: "png" | "json") {

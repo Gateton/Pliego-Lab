@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { BookMarked, ImageUp, Languages, Sparkles, UserCog } from "lucide-react";
 import * as charactersApi from "../../api/characters";
@@ -10,9 +10,31 @@ import type { TranslationKey } from "../../i18n";
 import { Button, Field, PageHeader, Toggle, inputClasses, textareaClasses } from "../ui";
 
 interface Props {
-  characterId: string;
+  /** `null` opens a draft: nothing exists on the server until the user saves it. */
+  characterId: string | null;
   onClose: () => void;
   embedded?: boolean;
+}
+
+function blankCard(): CharacterCard {
+  return {
+    id: "",
+    name: "",
+    description: "",
+    personality: "",
+    scenario: "",
+    first_mes: "",
+    mes_example: "",
+    creator_notes: "",
+    system_prompt: "",
+    post_history_instructions: "",
+    tags: [],
+    imageTags: "",
+    creator: "",
+    character_version: "",
+    lorebookIds: [],
+    isWorld: false,
+  };
 }
 
 /** Labels come from `characters.card`: they are the Character Card V2 field names the format defines. */
@@ -43,7 +65,7 @@ const TEXT_FIELDS: { key: keyof CharacterCard; labelKey: TranslationKey; rows: n
 
 export function CharacterEditor({ characterId, onClose, embedded = false }: Props) {
   const t = useT();
-  const [card, setCard] = useState<CharacterCard | null>(null);
+  const [card, setCard] = useState<CharacterCard | null>(() => (characterId === null ? blankCard() : null));
   const [tagsText, setTagsText] = useState("");
   const [imgVersion, setImgVersion] = useState(() => Date.now());
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -57,14 +79,29 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
   const [generatedTags, setGeneratedTags] = useState<string | null>(null);
   const [tagsError, setTagsError] = useState("");
   const [lorebooks, setLorebooks] = useState<Lorebook[]>([]);
+  const isDraft = characterId === null;
+  // A draft keeps its picked image in memory and uploads it together with the first save.
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const pendingImageUrl = useMemo(() => (pendingImage ? URL.createObjectURL(pendingImage) : null), [pendingImage]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
+    if (characterId === null) {
+      void lorebooksApi.listLorebooks().then(setLorebooks).catch(() => setLorebooks([]));
+      return;
+    }
     Promise.all([charactersApi.getCharacter(characterId), lorebooksApi.listLorebooks()]).then(([c, books]) => {
       setCard(c);
       setTagsText(c.tags.join(", "));
       setLorebooks(books);
     });
   }, [characterId]);
+
+  useEffect(() => {
+    if (!pendingImageUrl) return;
+    return () => URL.revokeObjectURL(pendingImageUrl);
+  }, [pendingImageUrl]);
 
   if (!card) return <p className="text-text-muted">{t("common.state.loading")}</p>;
 
@@ -73,6 +110,7 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
   }
 
   async function handleGenerateGreeting() {
+    if (characterId === null) return;
     setGeneratingGreeting(true);
     setGreetingError("");
     setGeneratedGreeting(null);
@@ -93,6 +131,7 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
   }
 
   async function handleTranslateGreeting() {
+    if (characterId === null) return;
     setTranslatingGreeting(true);
     setTranslationError("");
     setTranslatedGreeting(null);
@@ -113,6 +152,7 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
   }
 
   async function handleGenerateTags() {
+    if (characterId === null) return;
     setGeneratingTags(true);
     setTagsError("");
     setGeneratedTags(null);
@@ -138,14 +178,36 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
-    await charactersApi.updateCharacter(card.id, { ...card, tags });
-    onClose();
+    if (!card.name.trim()) {
+      setSaveError(t("characters.editor.draft.nameRequired"));
+      return;
+    }
+    setSaving(true);
+    setSaveError("");
+    try {
+      if (characterId === null) {
+        const { id: _draftId, ...fields } = card;
+        const created = await charactersApi.createCharacter({ ...fields, name: card.name.trim(), tags });
+        if (pendingImage) await charactersApi.replaceImage(created.id, pendingImage);
+      } else {
+        await charactersApi.updateCharacter(card.id, { ...card, tags });
+      }
+      onClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : t("characters.editor.draft.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleImageChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    if (characterId === null) {
+      setPendingImage(file);
+      return;
+    }
     await charactersApi.replaceImage(characterId, file);
     setImgVersion(Date.now());
   }
@@ -155,23 +217,37 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
       {!embedded && (
         <PageHeader
           icon={UserCog}
-          title={t("characters.editor.title", { name: card.name })}
+          title={isDraft ? t("chrome.library.newCharacter") : t("characters.editor.title", { name: card.name })}
           description={t("characters.editor.description")}
         />
       )}
 
       <div className="mb-6 flex items-center gap-3">
-        <img
-          src={`${charactersApi.imageUrl(characterId)}?t=${imgVersion}`}
-          alt={card.name}
-          className="h-24 w-24 rounded-md border border-border object-cover"
-        />
+        {characterId !== null ? (
+          <img
+            src={`${charactersApi.imageUrl(characterId)}?t=${imgVersion}`}
+            alt={card.name}
+            className="h-24 w-24 rounded-md border border-border object-cover"
+          />
+        ) : pendingImageUrl ? (
+          <img src={pendingImageUrl} alt={card.name} className="h-24 w-24 rounded-md border border-border object-cover" />
+        ) : (
+          <div className="flex h-24 w-24 items-center justify-center rounded-md border border-dashed border-border text-text-faint">
+            <UserCog size={28} />
+          </div>
+        )}
         <Button variant="secondary" onClick={() => imageInputRef.current?.click()}>
           <ImageUp size={16} />
           {t("characters.editor.changeImage")}
         </Button>
         <input ref={imageInputRef} type="file" accept="image/png" hidden onChange={handleImageChange} />
       </div>
+
+      {isDraft && (
+        <p className="mb-6 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-text-muted">
+          {t("characters.editor.draft.notice")}
+        </p>
+      )}
 
       <div className="mb-6 rounded-md border border-border bg-bg-elevated p-3">
         <Toggle
@@ -186,11 +262,11 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-text">{t("characters.editor.greeting.label")}</span>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={handleTranslateGreeting} disabled={translatingGreeting}>
+            <Button variant="secondary" size="sm" onClick={handleTranslateGreeting} disabled={isDraft || translatingGreeting} title={isDraft ? t("characters.editor.draft.aiNeedsSave") : undefined}>
               <Languages size={14} />
               {translatingGreeting ? t("characters.editor.greeting.translating") : t("characters.editor.greeting.translate")}
             </Button>
-            <Button variant="secondary" size="sm" onClick={handleGenerateGreeting} disabled={generatingGreeting}>
+            <Button variant="secondary" size="sm" onClick={handleGenerateGreeting} disabled={isDraft || generatingGreeting} title={isDraft ? t("characters.editor.draft.aiNeedsSave") : undefined}>
               <Sparkles size={14} />
               {generatingGreeting ? t("characters.action.generating") : t("characters.editor.greeting.regenerate")}
             </Button>
@@ -231,7 +307,7 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
       <div className="mb-6 rounded-md border border-border bg-bg-elevated p-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-text">{t("characters.card.imageTagsDanbooru")}</span>
-          <Button variant="secondary" size="sm" onClick={handleGenerateTags} disabled={generatingTags}>
+          <Button variant="secondary" size="sm" onClick={handleGenerateTags} disabled={isDraft || generatingTags} title={isDraft ? t("characters.editor.draft.aiNeedsSave") : undefined}>
             <Sparkles size={14} />
             {generatingTags ? t("characters.action.generating") : t("characters.editor.imageTags.generate")}
           </Button>
@@ -297,8 +373,9 @@ export function CharacterEditor({ characterId, onClose, embedded = false }: Prop
         </Field>
       </div>
 
+      {saveError && <p className="mt-4 text-sm text-danger">{saveError}</p>}
       <div className="mt-6 flex gap-2">
-        <Button variant="primary" onClick={handleSave}>
+        <Button variant="primary" onClick={handleSave} disabled={saving}>
           {t("common.actions.save")}
         </Button>
         <Button variant="ghost" onClick={onClose}>

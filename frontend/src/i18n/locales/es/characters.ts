@@ -137,6 +137,12 @@ export const characters = {
     },
   },
   editor: {
+    draft: {
+      notice: "Todavía no se guardó: el personaje se crea cuando pulsás Guardar. Si cancelás, no queda nada.",
+      nameRequired: "Ponele un nombre antes de guardar.",
+      saveFailed: "No se pudo guardar el personaje.",
+      aiNeedsSave: "Guardá el personaje primero para usar la IA.",
+    },
     title: "Editar a {name}",
     description: "Estos campos arman la ficha que el modelo lee en cada mensaje. Cuanto más claros, más consistente se mantiene el personaje.",
     changeImage: "Cambiar imagen",

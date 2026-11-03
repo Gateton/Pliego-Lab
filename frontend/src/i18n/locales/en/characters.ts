@@ -137,6 +137,12 @@ export const characters = {
     },
   },
   editor: {
+    draft: {
+      notice: "Not saved yet: the character is created when you press Save. Cancel and nothing is kept.",
+      nameRequired: "Give it a name before saving.",
+      saveFailed: "The character could not be saved.",
+      aiNeedsSave: "Save the character first to use AI.",
+    },
     title: "Editing {name}",
     description: "These fields build the card the model reads on every message. The clearer they are, the more consistent the character stays.",
     changeImage: "Change image",
