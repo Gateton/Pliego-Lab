@@ -72,7 +72,8 @@ export function commitBriefTrace(state: ActiveMemoryState, trace: MemoryBriefTra
 function itemLine(entry: RetrievedMemoryItem): string {
   if (entry.type === "fact") {
     const fact = entry.item as MemoryFact;
-    return `- ${fact.subject} ${fact.predicate} ${fact.object}. [${fact.status}]`;
+    // Status is ledger bookkeeping; only a disputed fact carries information the writer needs.
+    return `- ${fact.subject} ${fact.predicate} ${fact.object}.${fact.status === "disputed" ? " (disputed)" : ""}`;
   }
   if (entry.type === "thread") return `- ${(entry.item as MemoryThread).title}`;
   return `- ${(entry.item as MemoryEpisode).summary}`;

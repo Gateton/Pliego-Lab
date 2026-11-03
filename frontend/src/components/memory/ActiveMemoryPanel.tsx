@@ -101,6 +101,13 @@ export function ActiveMemoryPanel({
     setToggling(true);
     try {
       await toggleEnabled(next);
+      // Switching memory on in a chat that already has history reads that history right away,
+      // instead of leaving the ledger empty until the next reply settles.
+      if (next && onRunExtraction) {
+        void onRunExtraction().catch((failure) => {
+          setToggleError(failure instanceof Error ? failure.message : t("memory.panel.toggleFailed"));
+        });
+      }
     } catch (failure) {
       setToggleError(failure instanceof Error ? failure.message : t("memory.panel.toggleFailed"));
     } finally {

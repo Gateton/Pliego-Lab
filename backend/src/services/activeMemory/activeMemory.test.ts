@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { applyExtractionDraft, extractActiveMemory, extractWithHeuristics } from "./extractor.js";
@@ -10,9 +10,11 @@ import { segmentLine } from "./segments.js";
 import { describesVisualAppearance, validateExtractionDraft } from "./validator.js";
 import {
   createActiveMemoryStore,
-  createDefaultActiveMemoryState,
+  createDefaultActiveMemoryState as createStoreDefault,
   normalizeActiveMemoryState,
 } from "./store.js";
+import { MIGRATION_V2_REVISION_ID, migrateActiveMemoryLedgers, migrateLedgerToV2 } from "./migrate.js";
+import { ACTIVE_MEMORY_VERSION } from "./types.js";
 import { createSharedLedgerStore, mergeSharedLedger, publishToSharedLedger, scopeIsShared } from "./scope.js";
 import { applySettingsPatch, invalidateMemoryEvidence, mergeMemoryItems, patchMemoryItem } from "../../routes/activeMemory.js";
 import type {
@@ -22,6 +24,17 @@ import type {
   MemoryItemType,
   MemoryThread,
 } from "./types.js";
+
+/**
+ * Memoria Viva is opt-in and LLM-extracted by default. These tests exercise an enabled ledger on the
+ * offline heuristic path, so they opt in explicitly instead of relying on the shipped defaults.
+ */
+function createDefaultActiveMemoryState() {
+  const state = createStoreDefault();
+  state.settings.enabled = true;
+  state.settings.extractionMode = "heuristic";
+  return state;
+}
 
 function memoryFact(overrides: Partial<MemoryFact> & Pick<MemoryFact, "id" | "subject" | "predicate" | "object">): MemoryFact {
   return {
@@ -72,7 +85,7 @@ test("normalizes corrupt stored state instead of throwing", () => {
   const state = normalizeActiveMemoryState({ facts: "nope", scene: 42, version: 99 });
   assert.equal(state.facts.length, 0);
   assert.deepEqual(state.scene.presentCharacterIds, []);
-  assert.equal(state.version, 1);
+  assert.equal(state.version, ACTIVE_MEMORY_VERSION);
 });
 
 test("heuristic extraction cites real message ids and produces facts, threads and episodes", () => {
@@ -284,9 +297,9 @@ test("chat-known names survive even when they only open sentences", () => {
   assert.ok((draft.scene?.presentCharacterIds ?? []).includes("Daren"));
 });
 
-test("LLM extraction failures fall back to heuristics and report a warning", async () => {
+test("auto extraction falls back to heuristics when the model fails and reports a warning", async () => {
   const state = createDefaultActiveMemoryState();
-  state.settings.extractionMode = "llm";
+  state.settings.extractionMode = "auto";
   const result = await extractActiveMemory({
     messages: inputs([["m1", "assistant", "Iris tiene el mapa del monasterio."]]),
     state,
@@ -297,6 +310,104 @@ test("LLM extraction failures fall back to heuristics and report a warning", asy
   assert.equal(result.report.method, "heuristic-fallback");
   assert.ok(result.report.warnings[0].includes("provider down"));
   assert.ok(result.draft.facts.length >= 1);
+});
+
+test("strict LLM extraction stores nothing on failure and leaves the messages for a retry", async () => {
+  const state = createDefaultActiveMemoryState();
+  state.settings.extractionMode = "llm";
+  state.lastProcessedMessageId = "m0";
+  const result = await extractActiveMemory({
+    messages: inputs([["m1", "assistant", "Iris tiene el mapa del monasterio."]]),
+    state,
+    complete: async () => {
+      throw new Error("provider down");
+    },
+  });
+  assert.equal(result.draft.facts.length + result.draft.threads.length + result.draft.episodes.length, 0);
+  assert.deepEqual(result.report.processedMessageIds, []);
+  applyExtractionDraft(state, result);
+  assert.equal(state.lastProcessedMessageId, "m0", "the failed messages are retried next turn");
+});
+
+test("LLM extraction sees short message aliases and the remembered ledger, and citations map back", async () => {
+  const state = createDefaultActiveMemoryState();
+  state.settings.extractionMode = "llm";
+  state.facts = [memoryFact({ id: "f1", subject: "Daren", predicate: "debe a Iris", object: "700 monedas" })];
+  const realIds = ["5f0c9a52-1111-4f7e-9a7c-000000000001", "5f0c9a52-1111-4f7e-9a7c-000000000002"];
+  let seenIds: string[] = [];
+  let seenLedger = "";
+  let seenContent = "";
+  const result = await extractActiveMemory({
+    messages: inputs([
+      [realIds[0], "user", "¿Te parece 550 en lugar de 700?"],
+      [realIds[1], "assistant", 'Iris: <font color="#c0392b">"Está bien, 550 y no se habla más."</font>'],
+    ]),
+    state,
+    knownNames: ["Iris", "Daren"],
+    complete: async (messages, _model, context) => {
+      seenIds = messages.map((message) => message.id);
+      seenLedger = context?.ledger ?? "";
+      seenContent = messages[1].content;
+      return {
+        content: JSON.stringify({
+          facts: [{ subject: "Daren", predicate: "debe a Iris", object: "550 monedas", evidenceMessageIds: ["m1", "m2"] }],
+          threads: [],
+          episodes: [{ summary: "Daren regateó con Iris y cerraron el trato en 550 monedas.", sourceMessageIds: ["m2"] }],
+        }),
+        provider: "openai",
+        model: "test-model",
+        usage: { inputTokens: 1, outputTokens: 1, reasoningTokens: 0, cachedTokens: 0, totalTokens: 2, costUsd: 0 },
+      };
+    },
+  });
+  assert.deepEqual(seenIds, ["m1", "m2"]);
+  assert.ok(seenLedger.includes("Daren | debe a Iris | 700 monedas"));
+  assert.ok(!seenContent.includes("<font"), "markup is stripped before it reaches the extractor");
+  assert.equal(result.report.method, "llm");
+  assert.deepEqual(result.draft.facts[0].evidenceMessageIds, realIds);
+  assert.deepEqual(result.draft.episodes[0].sourceMessageIds, [realIds[1]]);
+  applyExtractionDraft(state, result, { idFactory: () => "f2" });
+  const live = state.facts.filter((fact) => !fact.validUntilMessageId);
+  assert.deepEqual(live.map((fact) => fact.object), ["550 monedas"], "the changed value supersedes the old one");
+});
+
+test("a fresh ledger is opt-in and LLM-extracted", () => {
+  const state = createStoreDefault();
+  assert.equal(state.settings.enabled, false);
+  assert.equal(state.settings.extractionMode, "llm");
+});
+
+test("the v2 migration turns memory off, clears heuristic output, keeps pins and can be rolled back", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "active-memory-migrate-"));
+  try {
+    const legacy = {
+      ...createDefaultActiveMemoryState(),
+      version: 1,
+      lastProcessedMessageId: "m9",
+      threads: [
+        { id: "t1", title: "¿Ves lo que te dije?", kind: "question", status: "open", participantIds: [], evidenceMessageIds: ["m1"], priority: 0.5, lastMentionedAt: 1 },
+        { id: "t2", title: "Recuperar la espada", kind: "goal", status: "open", participantIds: [], evidenceMessageIds: ["m2"], priority: 0.5, lastMentionedAt: 1, pinned: true },
+      ],
+    };
+    await writeFile(path.join(dir, "chat-a.json"), JSON.stringify(legacy), "utf-8");
+    assert.equal(await migrateActiveMemoryLedgers(dir), 1);
+    assert.equal(await migrateActiveMemoryLedgers(dir), 0, "idempotent");
+    const migrated = JSON.parse(await readFile(path.join(dir, "chat-a.json"), "utf-8"));
+    assert.equal(migrated.version, ACTIVE_MEMORY_VERSION);
+    assert.equal(migrated.settings.enabled, false);
+    assert.equal(migrated.settings.extractionMode, "llm");
+    assert.deepEqual(migrated.threads.map((thread: MemoryThread) => thread.id), ["t2"]);
+    assert.equal(migrated.lastProcessedMessageId, undefined, "rewound so enabling re-reads the history");
+    assert.equal(migrated.revisions.at(-1).id, MIGRATION_V2_REVISION_ID);
+
+    const store = createActiveMemoryStore({ dataDir: dir });
+    const restored = await store.rollback("chat-a", MIGRATION_V2_REVISION_ID);
+    assert.equal(restored?.threads.length, 2);
+    assert.equal(restored?.version, ACTIVE_MEMORY_VERSION, "a rollback is never re-migrated");
+    assert.equal(migrateLedgerToV2(normalizeActiveMemoryState(legacy)).settings.enabled, false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("an LLM payload citing unknown message ids is dropped, not trusted", async () => {

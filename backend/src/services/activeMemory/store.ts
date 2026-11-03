@@ -12,13 +12,16 @@ import {
 } from "./types.js";
 
 export const DEFAULT_ACTIVE_MEMORY_SETTINGS: ActiveMemorySettings = {
-  enabled: true,
-  extractionMode: "heuristic",
+  // Opt-in: a chat only remembers once the user switches memory on from its panel.
+  enabled: false,
+  // The heuristic extractor only recognises surface patterns and filled ledgers with quoted
+  // questions and copied sentences; the model is the only extractor that understands a scene.
+  extractionMode: "llm",
   model: "",
-  maxFacts: 12,
-  maxThreads: 6,
-  maxEpisodes: 3,
-  maxBriefItems: 16,
+  maxFacts: 16,
+  maxThreads: 8,
+  maxEpisodes: 6,
+  maxBriefItems: 30,
   maxBriefCharacters: 6_000,
   // 10% of the context window sits inside the 8-12% the design reserved for memory.
   briefBudgetPercent: 10,
@@ -221,6 +224,9 @@ export function createActiveMemoryStore(options: ActiveMemoryStoreOptions = {}) 
 
       const restored: ActiveMemoryState = {
         ...clone(target.before),
+        // A snapshot taken before a schema migration must not come back stamped with the old
+        // version, or the next startup would migrate (and clear) the restored ledger again.
+        version: ACTIVE_MEMORY_VERSION,
         revisions: clone(current.revisions),
       };
       restored.revisions.push({

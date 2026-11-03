@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as chatStore from "../services/chatStore.js";
 import { applyGuardReport, checkContinuity } from "../services/activeMemory/guard.js";
 import { getActiveMemory, updateActiveMemory } from "../services/activeMemory/store.js";
+import { resolveMemoryModel } from "../services/activeMemory/model.js";
 
 export const activeMemoryGuardRouter = Router();
 
@@ -42,7 +43,7 @@ activeMemoryGuardRouter.post("/:id/memory/guard", async (req, res) => {
     messageId: typeof body.messageId === "string" ? body.messageId : undefined,
     responderId: typeof body.responderId === "string" && body.responderId ? body.responderId : undefined,
     mode: body.mode === "heuristic" || body.mode === "llm" || body.mode === "auto" ? body.mode : undefined,
-    model: typeof body.model === "string" && body.model ? body.model : undefined,
+    model: await resolveMemoryModel(body.model, state.settings.model),
   });
 
   // Storing the report is not a canon change, so it deliberately skips the revision log: the panel

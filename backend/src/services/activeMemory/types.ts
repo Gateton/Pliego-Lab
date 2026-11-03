@@ -1,4 +1,8 @@
-export const ACTIVE_MEMORY_VERSION = 1 as const;
+/**
+ * v2: Memoria Viva became opt-in and LLM-extracted. Ledgers written as v1 are migrated once at
+ * startup (see migrate.ts): disabled, switched to LLM extraction and cleared of heuristic output.
+ */
+export const ACTIVE_MEMORY_VERSION = 2 as const;
 
 export type MemoryExtractionMode = "heuristic" | "llm" | "auto";
 export type MemoryFactStatus = "candidate" | "confirmed" | "disputed" | "invalidated";

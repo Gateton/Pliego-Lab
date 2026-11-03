@@ -1,8 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDefaultActiveMemoryState } from "./store.js";
+import { createDefaultActiveMemoryState as createStoreDefault } from "./store.js";
 import { applyGuardReport, checkContinuity, detectHeuristicFindings, selectGuardFacts } from "./guard.js";
 import type { ActiveMemoryState, GuardReport, MemoryFact } from "./types.js";
+
+/**
+ * Memoria Viva is opt-in and LLM-extracted by default. These tests exercise an enabled ledger on the
+ * offline heuristic path, so they opt in explicitly instead of relying on the shipped defaults.
+ */
+function createDefaultActiveMemoryState() {
+  const state = createStoreDefault();
+  state.settings.enabled = true;
+  state.settings.extractionMode = "heuristic";
+  return state;
+}
 
 function fact(overrides: Partial<MemoryFact> & Pick<MemoryFact, "id" | "subject" | "predicate" | "object">): MemoryFact {
   return {

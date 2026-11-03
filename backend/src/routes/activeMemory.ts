@@ -16,6 +16,7 @@ import {
   scopeIsShared,
 } from "../services/activeMemory/scope.js";
 import { cleanText, uniqueStrings } from "../services/activeMemory/validator.js";
+import { resolveMemoryModel } from "../services/activeMemory/model.js";
 import type {
   ActiveMemorySettings,
   ActiveMemoryState,
@@ -388,7 +389,7 @@ activeMemoryRouter.post("/:id/memory/extract", async (req, res) => {
     messages: window,
     state,
     mode: body.mode === "heuristic" || body.mode === "llm" || body.mode === "auto" ? body.mode : undefined,
-    model: typeof body.model === "string" && body.model ? body.model : undefined,
+    model: await resolveMemoryModel(body.model, state.settings.model),
     knownNames: knownNamesFor(entities),
     entities,
   });

@@ -59,7 +59,7 @@ export interface ExtractActiveMemoryOptions {
    * against this map so the ledger carries stable ids; without it the subject name is stored.
    */
   entities?: MemoryEntityRef[];
-  complete?: CompleteMemoryJson;
+  complete?: CompleteMemoryJsonWithContext;
   now?: () => number;
   idFactory?: () => string;
 }
@@ -514,32 +514,153 @@ function parseJsonObject(content: string): unknown {
   }
 }
 
-async function defaultComplete(messages: MemoryExtractionInput[], model?: string): Promise<CompleteMemoryJsonResult> {
-  const transcript = messages.map((message) => `[${message.id}] ${message.role}: ${message.content}`).join("\n\n");
+/**
+ * What the model already remembers, handed to the extractor so it can update instead of
+ * duplicate: supersede a changed fact by reusing its subject + predicate, and close a thread by
+ * repeating its exact title. Kept compact — it travels with every extraction call.
+ */
+export interface MemoryExtractionContext {
+  knownNames: string[];
+  ledger: string;
+}
+
+export type CompleteMemoryJsonWithContext = (
+  messages: MemoryExtractionInput[],
+  model?: string,
+  context?: MemoryExtractionContext,
+) => Promise<CompleteMemoryJsonResult>;
+
+const MAX_LEDGER_FACTS = 60;
+const MAX_LEDGER_THREADS = 30;
+const MAX_LEDGER_EPISODES = 8;
+
+export function describeLedgerForExtraction(state: ActiveMemoryState): string {
+  const lines: string[] = [];
+  const scene = state.scene;
+  const sceneParts = [
+    scene.location && `location: ${scene.location}`,
+    scene.narrativeTime && `time: ${scene.narrativeTime}`,
+    scene.presentCharacterIds.length && `present: ${scene.presentCharacterIds.join(", ")}`,
+    scene.immediateGoal && `goal: ${scene.immediateGoal}`,
+    scene.pendingAction && `pending: ${scene.pendingAction}`,
+  ].filter(Boolean);
+  if (sceneParts.length) lines.push(`SCENE: ${sceneParts.join(" | ")}`);
+  const facts = state.facts
+    .filter((fact) => fact.status !== "invalidated" && !fact.validUntilMessageId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_LEDGER_FACTS);
+  if (facts.length) {
+    lines.push("FACTS (subject | predicate | object):");
+    for (const fact of facts) lines.push(`- ${fact.subject} | ${fact.predicate} | ${fact.object}`);
+  }
+  const threads = state.threads
+    .filter((thread) => thread.status === "open" || thread.status === "snoozed")
+    .sort((a, b) => b.lastMentionedAt - a.lastMentionedAt)
+    .slice(0, MAX_LEDGER_THREADS);
+  if (threads.length) {
+    lines.push("OPEN THREADS (kind: exact title):");
+    for (const thread of threads) lines.push(`- ${thread.kind}: ${thread.title}`);
+  }
+  const episodes = [...state.episodes].sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_LEDGER_EPISODES);
+  if (episodes.length) {
+    lines.push("RECENT EPISODES:");
+    for (const episode of episodes.reverse()) lines.push(`- ${episode.summary}`);
+  }
+  return lines.length ? lines.join("\n") : "(empty — nothing remembered yet)";
+}
+
+/** Model-facing instructions for LLM extraction. English on purpose; the output follows the chat. */
+export const LLM_EXTRACTION_PROMPT = `You are the long-term memory of an ongoing roleplay story. Read the NEW MESSAGES and update the memory so the story stays coherent after these messages leave the context window. You receive what is already remembered; do not repeat it unless something changed.
+
+Return ONE JSON object, nothing else:
+{
+  "scene": { "location": "", "narrativeTime": "", "presentCharacterIds": ["Name"], "immediateGoal": "", "pendingAction": "", "tone": "", "lastSignificantChange": "", "evidenceMessageIds": ["m1"] },
+  "facts": [ { "subject": "", "predicate": "", "object": "", "importance": 0.0, "confidence": 0.0, "visibleTo": "all", "evidenceMessageIds": ["m1"] } ],
+  "threads": [ { "title": "", "kind": "promise|question|goal|threat|secret|plan|conflict|clue|interrupted_action", "status": "open|resolved|abandoned", "priority": 0.0, "participantIds": ["Name"], "resolutionCondition": "", "evidenceMessageIds": ["m1"] } ],
+  "episodes": [ { "summary": "", "participantIds": ["Name"], "location": "", "outcome": "", "emotionalWeight": 0.0, "sourceMessageIds": ["m1"] } ]
+}
+
+WHAT TO REMEMBER (things a reader would be annoyed to see the story forget)
+- facts: durable truths. Names and identities, who someone is to whom (relationships, feelings, trust, rivalries), agreements and deals (prices, amounts, terms), debts, possessions and who holds key objects, injuries and conditions, abilities, rules of the world, places, important past events characters now know, secrets and who knows them, preferences, fears, decisions taken.
+  - subject = a named character, place, group or object. predicate = a short verb phrase. object = the specific value, with concrete details (numbers, names, conditions).
+  - When something CHANGES (a price agreed, a relationship shifts, an object changes hands), reuse EXACTLY the same subject and predicate as the remembered fact with the new object: the old value will be retired automatically.
+  - visibleTo: "all" unless only some characters know it (a secret): then list the names who know it.
+- threads: unresolved story hooks that should come back later — promises, plans, debts to pay, threats, open questions that matter to the plot, mysteries, goals, unfinished actions. Not casual small talk or rhetorical questions.
+  - To close a remembered thread, repeat its EXACT title with status "resolved" (it happened) or "abandoned".
+- episodes: at most one or two per pass, only when something meaningful happened or concluded (a deal closed, a revelation, a fight, a first time, a betrayal, a decision, arriving somewhere new). One or two sentences in past tense: who did what, why, and how it ended. Skip episodes for turns where nothing really happened.
+- scene: only the fields that changed. presentCharacterIds = names of the characters currently in the scene.
+
+RULES
+- Only what the messages actually establish. Never invent, never guess motives that are not shown.
+- Ignore styling, colors, HTML, image tags, dice lines and out-of-character comments.
+- Write every text value in the SAME LANGUAGE as the story messages.
+- Use character names, never "user", "assistant", "you" or "I". Message ids are the short ids shown in brackets (m1, m2…); cite them in evidenceMessageIds / sourceMessageIds.
+- importance / confidence / priority / emotionalWeight are numbers 0..1.
+- Prefer fewer, richer items over many trivial ones. Empty arrays are fine when nothing new happened.`;
+
+async function defaultComplete(
+  messages: MemoryExtractionInput[],
+  model?: string,
+  context?: MemoryExtractionContext,
+): Promise<CompleteMemoryJsonResult> {
+  const transcript = messages
+    .map((message) => `[${message.id}] ${message.role === "user" ? "PLAYER" : "STORY"}:\n${message.content}`)
+    .join("\n\n");
+  const names = context?.knownNames.length ? `KNOWN CHARACTERS: ${context.knownNames.join(", ")}\n\n` : "";
   return completeJson(
     {
       model: model || undefined,
-      maxTokens: 3_500,
+      maxTokens: 6_000,
       messages: [
+        { role: "system", content: LLM_EXTRACTION_PROMPT },
         {
-          role: "system",
-          content:
-            "Extract only verifiable narrative memory from the supplied messages. Return one JSON object with optional scene and arrays facts, threads, episodes. Every item must cite evidenceMessageIds/sourceMessageIds using only the exact IDs supplied. facts need subject, predicate, object, confidence 0..1, importance 0..1, visibleTo ('all' or IDs). threads need title, kind (promise|question|goal|threat|secret|plan|conflict|clue|interrupted_action), priority 0..1 and evidenceMessageIds. Do not infer unsupported details.",
+          role: "user",
+          content: `${names}ALREADY REMEMBERED:\n${context?.ledger ?? "(empty)"}\n\nNEW MESSAGES:\n${transcript}\n\nReturn the JSON object now.`,
         },
-        { role: "user", content: transcript },
       ],
     },
     new AbortController().signal,
   );
 }
 
+/**
+ * Message ids are UUIDs, and models copy 36-character ids badly: one wrong character and the item
+ * is rejected for citing unknown evidence. The model sees short aliases (m1, m2…) instead, and the
+ * citations are mapped back before validation. Unknown citations stay as they are, so validation
+ * still drops them.
+ */
+function aliasMessages(messages: MemoryExtractionInput[]): { aliased: MemoryExtractionInput[]; toReal: Map<string, string> } {
+  const toReal = new Map<string, string>();
+  const aliased = messages.map((message, index) => {
+    const alias = `m${index + 1}`;
+    toReal.set(alias, message.id);
+    return { ...message, id: alias, content: stripMarkup(message.content) };
+  });
+  return { aliased, toReal };
+}
+
+function restoreMessageIds(value: unknown, toReal: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((item) => restoreMessageIds(item, toReal));
+  if (!value || typeof value !== "object") return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if ((key === "evidenceMessageIds" || key === "sourceMessageIds") && Array.isArray(item)) {
+      result[key] = item.map((id) => (typeof id === "string" ? toReal.get(id.trim().replace(/^\[|\]$/g, "")) ?? id : id));
+    } else {
+      result[key] = restoreMessageIds(item, toReal);
+    }
+  }
+  return result;
+}
+
 export async function extractActiveMemory(options: ExtractActiveMemoryOptions): Promise<ExtractActiveMemoryResult> {
   const requestedMode = options.mode ?? options.state.settings.extractionMode;
-  const complete = options.complete ?? defaultComplete;
+  const complete: CompleteMemoryJsonWithContext = options.complete ?? defaultComplete;
   const warnings: string[] = [];
   let draft: MemoryExtractionDraft;
   let method: MemoryExtractionReport["method"] = "heuristic";
   let meta: GenerationMeta | undefined;
+  let processedMessageIds = options.messages.map((message) => message.id);
 
   if (requestedMode === "heuristic") {
     draft = extractWithHeuristics(options.messages, {
@@ -548,16 +669,32 @@ export async function extractActiveMemory(options: ExtractActiveMemoryOptions): 
     });
   } else {
     try {
-      const response = await complete(options.messages, options.model ?? options.state.settings.model);
-      const validated = validateExtractionDraft(parseJsonObject(response.content), options.messages.map((message) => message.id));
+      const { aliased, toReal } = aliasMessages(options.messages);
+      const context: MemoryExtractionContext = {
+        knownNames: options.knownNames ?? [],
+        ledger: describeLedgerForExtraction(options.state),
+      };
+      const response = await complete(aliased, options.model ?? options.state.settings.model, context);
+      const parsed = restoreMessageIds(parseJsonObject(response.content), toReal);
+      const validated = validateExtractionDraft(parsed, options.messages.map((message) => message.id));
       draft = validated.draft;
       warnings.push(...validated.warnings);
       meta = { provider: response.provider, model: response.model, usage: response.usage };
       method = "llm";
     } catch (error) {
-      draft = extractWithHeuristics(options.messages, { knownNames: options.knownNames });
-      method = "heuristic-fallback";
-      warnings.push(`LLM extraction failed; heuristic fallback used: ${error instanceof Error ? error.message : "unknown error"}`);
+      const reason = error instanceof Error ? error.message : "unknown error";
+      if (requestedMode === "auto") {
+        draft = extractWithHeuristics(options.messages, { knownNames: options.knownNames });
+        method = "heuristic-fallback";
+        warnings.push(`LLM extraction failed; heuristic fallback used: ${reason}`);
+      } else {
+        // Strict LLM mode stores nothing rather than heuristic noise, and leaves these messages
+        // unprocessed so the next turn retries them.
+        draft = { facts: [], threads: [], episodes: [] };
+        method = "llm";
+        processedMessageIds = [];
+        warnings.push(`LLM extraction failed; nothing stored, will retry next turn: ${reason}`);
+      }
     }
     // The LLM path must honour the same guarantee as the heuristic one: when visual facts are
     // deferred, an outfit/appearance fact never reaches the ledger even if the model returned it.
@@ -578,7 +715,7 @@ export async function extractActiveMemory(options: ExtractActiveMemoryOptions): 
     report: {
       requestedMode,
       method,
-      processedMessageIds: options.messages.map((message) => message.id),
+      processedMessageIds,
       addedFacts: 0,
       updatedFacts: 0,
       addedThreads: 0,

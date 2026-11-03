@@ -297,9 +297,12 @@ export async function checkContinuity(options: CheckContinuityOptions): Promise<
     return { ...heuristic("heuristic") };
   }
 
+  const facts = selectGuardFacts(state, options.responderId);
+  // Nothing to contradict yet: a model call would cost a request to say so.
+  if (facts.length === 0) return { ...base, method: "heuristic", findings: [], warnings };
+
   try {
     const complete = options.complete ?? defaultComplete;
-    const facts = selectGuardFacts(state, options.responderId);
     const response = await complete(buildPrompt(facts, responseText), options.model ?? state.settings.model);
     const validated = validateGuardFindings(parseJsonObject(response.content), state, responseText);
     warnings.push(...validated.warnings);

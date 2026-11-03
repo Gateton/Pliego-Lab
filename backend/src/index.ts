@@ -4,6 +4,7 @@ import { migratePrompts } from "./services/migratePrompts.js";
 import { migrateGenerationSettings } from "./services/migrateGenerationSettings.js";
 import { seedDefaultCharacters } from "./services/defaultCharacters.js";
 import { seedDefaultSamplingPreset } from "./services/seedDefaultSamplingPreset.js";
+import { migrateActiveMemoryLedgers } from "./services/activeMemory/migrate.js";
 
 const app = createApp();
 
@@ -11,6 +12,10 @@ migratePrompts()
   .then(() => migrateGenerationSettings())
   .then(() => seedDefaultSamplingPreset())
   .then(() => seedDefaultCharacters())
+  .then(() => migrateActiveMemoryLedgers())
+  .then((count) => {
+    if (count > 0) console.log(`[migrations] Memoria Viva: ${count} ledger(s) moved to v2 (opt-in, LLM extraction).`);
+  })
   .catch((error) => {
     console.error("[migrations] failed:", error);
   })
