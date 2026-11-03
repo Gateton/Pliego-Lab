@@ -1,5 +1,5 @@
 import type { ModelDescriptor } from "../types/provider";
-import type { CharacterVisualState, DirectorStateUpdate, ImageDirectorSettings } from "../types/imageDirector";
+import type { CharacterVisualState, DirectorStateUpdate, ImageDirectorSettings, SceneStateLedger } from "../types/imageDirector";
 import { responseError } from "./requestError";
 
 async function asJson<T>(response: Response): Promise<T> {
@@ -15,6 +15,7 @@ export interface DirectorContext {
   persona?: { name: string; imageTags: string };
   recentMessages?: Array<{ role: string; content: string }>;
   visualState?: Record<string, CharacterVisualState>;
+  sceneState?: SceneStateLedger;
   chatId?: string;
 }
 
@@ -37,6 +38,7 @@ export function runImageDirector(
 ): Promise<{
   taggedText: string;
   stateUpdates: DirectorStateUpdate[];
+  scene?: SceneStateLedger;
   diagnostic: { response: string; reasoning: string };
 }> {
   return fetch("/api/image-director/run", {
@@ -44,7 +46,7 @@ export function runImageDirector(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, ...context }),
     signal,
-  }).then((r) => asJson<{ taggedText: string; stateUpdates: DirectorStateUpdate[]; diagnostic: { response: string; reasoning: string } }>(r));
+  }).then((r) => asJson<{ taggedText: string; stateUpdates: DirectorStateUpdate[]; scene?: SceneStateLedger; diagnostic: { response: string; reasoning: string } }>(r));
 }
 
 export function checkVisualState(

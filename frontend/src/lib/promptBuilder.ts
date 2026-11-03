@@ -120,6 +120,7 @@ export function buildPrompt(
     npcTracker: "",
     comfyInject: "",
     pluma: "",
+    visualState: "",
     ...buildBaseDict(character, persona),
     ...(chat.variables ?? {}),
     ...extraMacros,
@@ -179,6 +180,10 @@ export function buildPrompt(
     const content = stripImageTags ? stripImageMarkers(compacted) : compacted;
     messages.push({ role: m.role, content: substituteMacros(content, dict) });
   }
+
+  // Current appearance goes right after the history: it is the freshest state of the scene, it
+  // sits close to the reply where it is followed best, and it leaves the cached prefix untouched.
+  if (dict.visualState.trim()) messages.push({ role: "system", content: dict.visualState.trim() });
 
   // Lorebook at-depth entries count from the end of the assembled history.
   for (const injection of lorebook?.atDepth ?? []) {

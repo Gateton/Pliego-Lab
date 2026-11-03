@@ -21,11 +21,12 @@ import type { ComfyInjectSettings } from "../types/comfyInject";
 import type { GuardReport } from "../types/activeMemory";
 import type { RecastPreset, RecastSettings } from "../types/recast";
 import type { NpcField, NpcTrackerSettings } from "../types/npcTracker";
-import type { CharacterVisualState, DirectorDiagnostic, DirectorStateUpdate, ImageDirectorSettings } from "../types/imageDirector";
+import type { CharacterVisualState, DirectorDiagnostic, DirectorStateUpdate, ImageDirectorSettings, SceneStateLedger } from "../types/imageDirector";
 import { buildPrompt } from "../lib/promptBuilder";
 import { buildRecastPasses } from "../lib/recastPromptBuilder";
 import { hasImageMarker, splitTextWithMarkers } from "../lib/imageMarkers";
 import { buildPlumaMacro } from "../lib/pluma";
+import { buildVisualStateMacro } from "../lib/visualStateContext";
 import { buildAddonsMacro } from "../lib/addons";
 import { buildNpcTrackerMacro, detectPossibleNewName, extractMentionedNpcs, findNpcByName, normalizeNpcs, scoreNpcRelevance } from "../lib/npcTracker";
 import { buildComfyInjectMacro } from "../lib/comfyInjectPrompt";
@@ -262,6 +263,7 @@ export function useChat(chatId: string | null, onPersisted?: () => void) {
         personaId: toSave.personaId,
         variables: toSave.variables,
         visualState: toSave.visualState,
+        sceneState: toSave.sceneState,
       });
       onPersistedRef.current?.();
     } catch {
@@ -977,6 +979,19 @@ export function useChat(chatId: string | null, onPersisted?: () => void) {
     [scheduleSave, pushEvent],
   );
 
+  // The Director returns the whole scene snapshot each pass (positions + objects), so it replaces
+  // the stored one instead of being merged: people who left and props put away drop out.
+  const applySceneState = useCallback(
+    (scene: SceneStateLedger) => {
+      const current = chatRef.current;
+      if (!current) return;
+      const nextChat: Chat = { ...current, sceneState: scene };
+      setChat(nextChat);
+      scheduleSave(nextChat);
+    },
+    [scheduleSave],
+  );
+
   const tagWithDirector = useCallback(
     async (text: string, settings: ImageDirectorSettings | null | undefined, messageId?: string): Promise<string> => {
       const chatNow = chatRef.current;
@@ -1014,22 +1029,26 @@ export function useChat(chatId: string | null, onPersisted?: () => void) {
       if (chatNow?.visualState) {
         context.visualState = chatNow.visualState;
       }
+      if (chatNow?.sceneState) {
+        context.sceneState = chatNow.sceneState;
+      }
       const controller = new AbortController();
       directorAbortControllerRef.current = controller;
       try {
-        const { taggedText, stateUpdates, diagnostic } = await withTimeout(
+        const { taggedText, stateUpdates, scene, diagnostic } = await withTimeout(
           directorApi.runImageDirector(text, context, controller.signal),
           Math.max(30, settings?.directorTimeoutSeconds ?? 240) * 1000,
           t("chat.director.moduleName"),
         );
         if (messageId) setDirectorDiagnostics((prev) => ({ ...prev, [messageId]: diagnostic }));
         if (stateUpdates?.length) applyVisualStateUpdates(stateUpdates, messageId);
+        if (scene) applySceneState(scene);
         return taggedText && taggedText !== text ? taggedText : text;
       } finally {
         directorAbortControllerRef.current = null;
       }
     },
-    [character, persona, applyVisualStateUpdates],
+    [character, persona, applyVisualStateUpdates, applySceneState],
   );
 
   // Overwrites a swipe's text with `fullText`, clearing its resolved images (stale tags).
@@ -1254,6 +1273,12 @@ export function useChat(chatId: string | null, onPersisted?: () => void) {
       const npcTracker = buildNpcTrackerMacro(fresh.npcTrackerSettings, npcChat.npcs ?? [], recentChatText, mentionedNpcs);
       const comfyInject = buildComfyInjectMacro(fresh.comfyInjectSettings, character?.imageTags);
       const plumaText = buildPlumaMacro(fresh.plumaSettings);
+      // Only while the Director keeps the ledger up to date; a ledger nobody maintains goes stale.
+      const visualStateText = buildVisualStateMacro(
+        chatForBuild.visualState,
+        fresh.imageDirectorSettings?.enabled === true,
+        chatForBuild.sceneState,
+      );
       const promptChat = chatForBuild;
       // The active preset owns its prompt blocks; with none it contributes no blocks at all (the
       // global prompt list applies only while no preset is active). The context template still
@@ -1305,6 +1330,7 @@ export function useChat(chatId: string | null, onPersisted?: () => void) {
           npcTracker,
           comfyInject,
           pluma: plumaText,
+          visualState: visualStateText,
         },
         fresh.comfyInjectSettings.directorMode === true && fresh.imageDirectorSettings?.enabled === true,
         lorebook,

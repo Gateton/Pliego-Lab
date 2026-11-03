@@ -1,7 +1,7 @@
 // Image Director pipeline — sends text to a secondary model that inserts [[IMG:...]] tags
 // at narratively appropriate moments. ComfyInject then renders those tags as images.
 import { completeChat, type GenerationMeta, type SamplingParams } from "./llm.js";
-import type { CharacterVisualState, DirectorStateUpdate, ImageDirectorSettings } from "../types.js";
+import type { CharacterVisualState, DirectorStateUpdate, ImageDirectorSettings, SceneStateLedger } from "../types.js";
 import { sanitizeImageMarker, sanitizeImageMarkers, sanitizeTagList } from "./directorTags.js";
 
 /** Identity tags are copied verbatim into every image, so a negation in them ("no scars") would be
@@ -131,16 +131,21 @@ const VISUAL_STATE_RULES = `- Add one entry to "stateUpdates" per character whos
 - "stateAdded"/"stateRemoved" are ONLY for durable physical/appearance conditions that persist across turns without a narrative event changing them (wet, dirty, injured, bruised, tear-streaked face, disheveled hair, sweat, a blush that lingers, etc.) — never personality or behavior tags, never clothing/nudity (that's outfitChanged/newOutfit), and NEVER current pose/activity/action (standing, cooking, carrying something, sitting, walking) — those are derived fresh per image from THIS turn's text via the normal pose tag and must never be stored in the ledger. Also never an accessory-ABSENCE tag ("uncollared", "bare neck") — same rule as clothing: if it's not worn, don't mention it anywhere.
 - ACTIVE REVIEW, not just append: every turn, reconsider EVERY tag already on a character's ledger, not only what's new. If a condition has resolved, is no longer contextually true, or was never a durable condition to begin with (see scope above — e.g. a leftover pose/activity tag), put it in "stateRemoved". Only ever adding and never removing is a FAILED update.`;
 
+const SCENE_LEDGER_RULES = `- "scene" is the snapshot of the scene at the END of the text — the moment the next reply continues from. ALWAYS return it, complete, replacing the "## CURRENT SCENE" ledger above (copy what did not change, update what did, drop what is gone).
+- "positions": one entry per character physically present at the end of the text, including the player's own character when the prose places them. One short English phrase: posture + where + contact with others (e.g. "kneeling on the bed facing Daren, hands on his thighs", "lying on her back under Daren, legs around his waist", "standing by the window, arms crossed"). Concrete and physical only — no feelings, no clothing (that is the outfit ledger). A character who left the scene is not listed.
+- "objects": only objects that matter to what is happening or may come back: restraints, toys, weapons, drinks, money, documents, keys, a removed garment and where it was dropped. Each one: "<object> — <where it is or who holds it>". At most 10. Remove objects that are put away or no longer relevant. Room furniture is not an object unless someone is using it.`;
+
 const PERSISTENT_STATE_PROMPT = `
 ══════════════════════════════════════════
 OUTPUT FORMAT — JSON MODE (overrides the plain-text output format above)
 ══════════════════════════════════════════
 Return ONLY a JSON object — no markdown fences, no prose outside it — in this exact shape:
-{"taggedText": "<the full text with [[IMG:...]] tags inserted, following every rule above unchanged>", "stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same CLOTHING format as slot [8]>", "stateAdded": ["..."], "stateRemoved": ["..."]}]}
+{"taggedText": "<the full text with [[IMG:...]] tags inserted, following every rule above unchanged>", "stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same CLOTHING format as slot [8]>", "stateAdded": ["..."], "stateRemoved": ["..."]}], "scene": {"positions": {"<exact name>": "<position>"}, "objects": ["<object — where it is / who holds it>"]}}
 
 - "taggedText" is the SAME output you would otherwise return as plain text — nothing about the tag-writing rules changes, only the envelope.
 ${VISUAL_STATE_RULES}
-- Never omit "taggedText", even when there are no images to insert — return the original text unchanged inside it in that case.`;
+- Never omit "taggedText", even when there are no images to insert — return the original text unchanged inside it in that case.
+${SCENE_LEDGER_RULES}`;
 
 /** Standalone audit pass: verify/correct the visual-state ledger without writing any
  * [[IMG:...]] tags at all — used by the manual "Revisar estado" button, separate from the
@@ -257,6 +262,7 @@ export interface DirectorContext {
   persona?: { name: string; imageTags: string };
   recentMessages?: Array<{ role: string; content: string }>;
   visualState?: Record<string, CharacterVisualState>;
+  sceneState?: SceneStateLedger;
 }
 
 function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings): string {
@@ -355,6 +361,18 @@ function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings
     }
   }
 
+  // Scene ledger — positions and objects at the end of the previous turn, so the Director carries
+  // them forward instead of re-guessing them from prose that may no longer mention them.
+  if (ctx.sceneState) {
+    const positions = Object.entries(ctx.sceneState.positions ?? {}).map(([name, position]) => `- ${name}: ${position}`);
+    const objects = (ctx.sceneState.objects ?? []).map((object) => `- ${object}`);
+    if (positions.length || objects.length) {
+      parts.push(
+        `## CURRENT SCENE (end of the previous turn — update it in "scene")\nPositions:\n${positions.join("\n") || "- (none recorded)"}\nObjects:\n${objects.join("\n") || "- (none recorded)"}`,
+      );
+    }
+  }
+
   // Recent messages
   if (settings.contextDepth > 0 && ctx.recentMessages && ctx.recentMessages.length > 0) {
     const depth = Math.min(settings.contextDepth, ctx.recentMessages.length);
@@ -374,20 +392,44 @@ function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings
 /** Tolerant JSON parse for the persistent-state output contract: strip code fences, take the
  * outermost {...} object — same approach as the NPC scanner's parser, since models don't always
  * honour `response_format` exactly. */
-function parseDirectorJson(content: string): { taggedText: string; stateUpdates: DirectorStateUpdate[] } | null {
+/** Normalizes the Director's "scene" object; `undefined` when absent or unusable (keep the old one). */
+export function parseSceneLedger(value: unknown, now = Date.now()): SceneStateLedger | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as { positions?: unknown; objects?: unknown };
+  const positions: Record<string, string> = {};
+  if (raw.positions && typeof raw.positions === "object" && !Array.isArray(raw.positions)) {
+    for (const [name, position] of Object.entries(raw.positions as Record<string, unknown>)) {
+      if (typeof position !== "string") continue;
+      const cleanName = name.trim().slice(0, 80);
+      const cleanPosition = position.replace(/\s+/g, " ").trim().slice(0, 240);
+      if (cleanName && cleanPosition) positions[cleanName] = cleanPosition;
+    }
+  }
+  const objects = Array.isArray(raw.objects)
+    ? raw.objects
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.replace(/\s+/g, " ").trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 10)
+    : [];
+  if (!raw.positions && !raw.objects) return undefined;
+  return { positions, objects, updatedAt: now };
+}
+
+function parseDirectorJson(content: string): { taggedText: string; stateUpdates: DirectorStateUpdate[]; scene?: SceneStateLedger } | null {
   const text = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) return null;
   try {
-    const parsed = JSON.parse(text.slice(start, end + 1)) as { taggedText?: unknown; stateUpdates?: unknown };
+    const parsed = JSON.parse(text.slice(start, end + 1)) as { taggedText?: unknown; stateUpdates?: unknown; scene?: unknown };
     if (typeof parsed.taggedText !== "string") return null;
     const stateUpdates = Array.isArray(parsed.stateUpdates)
       ? parsed.stateUpdates.filter(
           (u): u is DirectorStateUpdate => !!u && typeof u === "object" && typeof (u as DirectorStateUpdate).character === "string",
         )
       : [];
-    return { taggedText: parsed.taggedText, stateUpdates };
+    return { taggedText: parsed.taggedText, stateUpdates, scene: parseSceneLedger(parsed.scene) };
   } catch {
     return null;
   }
@@ -396,6 +438,8 @@ function parseDirectorJson(content: string): { taggedText: string; stateUpdates:
 export interface DirectorResult {
   taggedText: string;
   stateUpdates: DirectorStateUpdate[];
+  /** Present only when the Director returned a usable scene snapshot. */
+  scene?: SceneStateLedger;
   meta: GenerationMeta;
   diagnostic: {
     response: string;
@@ -450,10 +494,12 @@ export async function runImageDirector(
 
     let taggedTextRaw = result;
     let stateUpdates: DirectorStateUpdate[] = [];
+    let scene: SceneStateLedger | undefined;
     const parsed = parseDirectorJson(result);
     if (parsed) {
       taggedTextRaw = parsed.taggedText;
       stateUpdates = parsed.stateUpdates;
+      scene = parsed.scene;
     } else {
       console.warn(`[Image Director] JSON parse failed — falling back to raw text. Preview: ${result.slice(0, 300)}`);
     }
@@ -470,7 +516,7 @@ export async function runImageDirector(
     console.log(`[Image Director] result: ${cleaned.length} chars, hasImgTags=${hasImgTags}, stateUpdates=${stateUpdates.length}`);
     if (!hasImgTags) {
       console.warn(`[Image Director] no tags returned. Preview: ${cleaned.slice(0, 300)}`);
-      return { taggedText: text, stateUpdates: [], meta, diagnostic };
+      return { taggedText: text, stateUpdates: [], scene, meta, diagnostic };
     }
     const sanitized = sanitizeImageMarkers(cleaned);
     cleaned = sanitized.text;
@@ -484,7 +530,7 @@ export async function runImageDirector(
       // JSON envelope got cut short). Returning `cleaned` here would leak the dangling, unclosed
       // "[[IMG: ..." fragment straight into the visible message text.
       console.warn(`[Image Director] "[[IMG:" present but no complete tag matched (likely truncated). Preview: ${cleaned.slice(-300)}`);
-      return { taggedText: text, stateUpdates, meta, diagnostic };
+      return { taggedText: text, stateUpdates, scene, meta, diagnostic };
     }
     if (tags.length > settings.maxImagesPerTurn) {
       console.warn(`[Image Director] model emitted ${tags.length} images, capping to configured max ${settings.maxImagesPerTurn}`);
@@ -510,7 +556,7 @@ export async function runImageDirector(
       }
     });
 
-    return { taggedText: cleaned, stateUpdates, meta, diagnostic };
+    return { taggedText: cleaned, stateUpdates, scene, meta, diagnostic };
   } catch (error) {
     console.error("[Image Director] Generation failed:", error);
     throw error;

@@ -37,6 +37,7 @@ export function updateChat(
     personaId?: string | null;
     variables?: Record<string, string>;
     visualState?: Record<string, CharacterVisualState>;
+    sceneState?: Chat["sceneState"];
   },
 ): Promise<Chat> {
   return fetch(`/api/chats/${id}`, {

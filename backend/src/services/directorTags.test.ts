@@ -33,3 +33,20 @@ test("the enhancer matches whole tags, and weather wins over time of day", () =>
   assert.ok(!enhancePrompt("masterpiece, 1girl, soft skin, glowing eyes").includes("light"));
   assert.ok(!enhancePrompt("masterpiece, 1girl, night").includes("starry sky"));
 });
+
+test("the scene snapshot is normalized, capped and absent when the Director skipped it", async () => {
+  const { parseSceneLedger } = await import("./imageDirector.js");
+  assert.equal(parseSceneLedger(undefined), undefined);
+  assert.equal(parseSceneLedger("nope"), undefined);
+  const scene = parseSceneLedger(
+    {
+      positions: { " Iris ": "  kneeling on the bed,\n wrists tied ", Daren: 42, "": "x" },
+      objects: ["silk rope — on Iris's wrists", 7, "", ...Array.from({ length: 12 }, (_, i) => `prop ${i}`)],
+    },
+    5,
+  );
+  assert.deepEqual(scene?.positions, { Iris: "kneeling on the bed, wrists tied" });
+  assert.equal(scene?.objects[0], "silk rope — on Iris's wrists");
+  assert.equal(scene?.objects.length, 10);
+  assert.equal(scene?.updatedAt, 5);
+});

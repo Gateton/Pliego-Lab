@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as directorApi from "../api/imageDirector";
-import type { CharacterVisualState, ImageDirectorSettings } from "../types/imageDirector";
+import type { CharacterVisualState, ImageDirectorSettings, SceneStateLedger } from "../types/imageDirector";
 
 export interface DirectorRunContext {
   character?: { name: string; description: string; personality: string; scenario: string; imageTags: string };
@@ -8,6 +8,7 @@ export interface DirectorRunContext {
   persona?: { name: string; imageTags: string };
   recentMessages?: Array<{ role: string; content: string }>;
   visualState?: Record<string, CharacterVisualState>;
+  sceneState?: SceneStateLedger;
   chatId?: string;
 }
 

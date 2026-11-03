@@ -124,6 +124,7 @@ export async function updateChat(
     personaId?: string | null;
     variables?: Record<string, string>;
     visualState?: Chat["visualState"];
+    sceneState?: Chat["sceneState"];
   },
 ): Promise<Chat | null> {
   return enqueueOp(id, async () => {
@@ -142,6 +143,7 @@ export async function updateChat(
       npcTracker: patch.npcTracker ?? existing.npcTracker,
       variables: patch.variables ?? existing.variables,
       visualState: patch.visualState ?? existing.visualState,
+      sceneState: patch.sceneState ?? existing.sceneState,
       updatedAt: Date.now(),
     };
     await writeChatFile(next);

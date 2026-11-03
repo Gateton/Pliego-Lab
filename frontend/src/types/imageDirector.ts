@@ -29,6 +29,19 @@ export interface VisualStateHistoryEntry {
   summary: string;
 }
 
+/**
+ * Where the bodies are and what is in play right now, kept by the Image Director next to the
+ * outfit ledger: one short position per character on stage, and the objects that matter.
+ * Replaced as a whole on every Director pass, so people who left and props put away disappear.
+ */
+export interface SceneStateLedger {
+  /** Character name → posture, placement and contact (e.g. "kneeling on the bed, wrists tied"). */
+  positions: Record<string, string>;
+  /** Objects in play and where they are / who holds them. */
+  objects: string[];
+  updatedAt: number;
+}
+
 export interface CharacterVisualState {
   outfit: string;
   state: string[];

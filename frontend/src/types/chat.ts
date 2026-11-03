@@ -1,6 +1,6 @@
 import type { GeneratedImageResult } from "./comfyInject";
 import type { NpcRecord } from "./npcTracker";
-import type { CharacterVisualState } from "./imageDirector";
+import type { CharacterVisualState, SceneStateLedger } from "./imageDirector";
 
 export interface TurnEventChange {
   key: string;
@@ -58,6 +58,7 @@ export interface Chat {
   npcTracker?: { lastScannedCount: number; lastEvolvedCount?: number };
   variables?: Record<string, string>;
   visualState?: Record<string, CharacterVisualState>;
+  sceneState?: SceneStateLedger;
 }
 
 export interface ChatSummary {

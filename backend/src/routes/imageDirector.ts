@@ -3,7 +3,7 @@ import * as imageDirectorSettingsStore from "../services/imageDirectorSettingsSt
 import { recordUsage } from "../services/usageStore.js";
 import { runImageDirector, runDirectorReaction, checkVisualState } from "../services/imageDirector.js";
 import { listModels } from "../services/llm.js";
-import type { CharacterVisualState, ImageDirectorSettings } from "../types.js";
+import type { CharacterVisualState, ImageDirectorSettings, SceneStateLedger } from "../types.js";
 import { apiErrorBody } from "../services/apiError.js";
 
 /** Image Director: a secondary model that inserts [[IMG:...]] markers for ComfyInject to render. */
@@ -15,6 +15,7 @@ interface DirectorContext {
   persona?: { name: string; imageTags: string };
   recentMessages?: Array<{ role: string; content: string }>;
   visualState?: Record<string, CharacterVisualState>;
+  sceneState?: SceneStateLedger;
   chatId?: string;
 }
 
@@ -32,7 +33,7 @@ imageDirectorRouter.put("/settings", async (req, res) => {
 });
 
 imageDirectorRouter.post("/run", async (req, res) => {
-  const { text, character, npcs, persona, recentMessages, visualState, chatId } = req.body as DirectorContext & { text?: string };
+  const { text, character, npcs, persona, recentMessages, visualState, sceneState, chatId } = req.body as DirectorContext & { text?: string };
   if (!text || typeof text !== "string") {
     res.status(400).json({ error: "text is required" });
     return;
@@ -54,14 +55,14 @@ imageDirectorRouter.post("/run", async (req, res) => {
   res.on("close", () => controller.abort());
 
   try {
-    const { taggedText, stateUpdates, meta, diagnostic } = await runImageDirector(
+    const { taggedText, stateUpdates, scene, meta, diagnostic } = await runImageDirector(
       text,
       settings,
-      { character, npcs, persona, recentMessages, visualState },
+      { character, npcs, persona, recentMessages, visualState, sceneState },
       controller.signal,
     );
     await recordUsage({ chatId: chatId ?? null, stage: "director", provider: meta.provider, model: meta.model, ...meta.usage, timestamp: Date.now() });
-    res.json({ taggedText, stateUpdates, diagnostic });
+    res.json({ taggedText, stateUpdates, scene, diagnostic });
   } catch (error) {
     if (controller.signal.aborted) return; // Client already disconnected — nothing to respond to.
     res.status(502).json({ error: (error as Error).message });

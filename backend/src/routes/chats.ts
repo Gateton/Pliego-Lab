@@ -90,7 +90,7 @@ chatsRouter.put("/:id/rename", async (req, res) => {
 });
 
 chatsRouter.put("/:id", async (req, res) => {
-  const { title, messages, extensionData, npcs, npcTracker, personaId, variables, visualState } = req.body as {
+  const { title, messages, extensionData, npcs, npcTracker, personaId, variables, visualState, sceneState } = req.body as {
     title?: string;
     messages?: unknown;
     extensionData?: Record<string, unknown>;
@@ -99,6 +99,7 @@ chatsRouter.put("/:id", async (req, res) => {
     personaId?: string | null;
     variables?: Record<string, string>;
     visualState?: import("../types.js").Chat["visualState"];
+    sceneState?: import("../types.js").Chat["sceneState"];
   };
   if (typeof title !== "string" || !Array.isArray(messages)) {
     res.status(400).json({ error: "title and messages are required" });
@@ -126,6 +127,7 @@ chatsRouter.put("/:id", async (req, res) => {
     personaId: validatedPersonaId,
     variables,
     visualState,
+    sceneState,
   });
   if (!chat) {
     res.status(404).json(apiErrorBody("chat.notFound"));
