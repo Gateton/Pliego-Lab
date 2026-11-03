@@ -215,6 +215,8 @@ export interface AppSettings {
   density: "comfortable" | "compact";
   outputLanguage: string;
   coloredDialogue: boolean;
+  /** Asks the model for long, dialogue-driven replies instead of short, narration-heavy ones. */
+  dialogueFocus: boolean;
   favoriteCharacterIds: string[];
   /** Onboarding bookkeeping, versioned so bumping a constant re-shows it. null = never seen. */
   onboardingWizardVersion: number | null;

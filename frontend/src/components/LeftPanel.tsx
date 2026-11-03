@@ -265,6 +265,13 @@ export function LeftPanel({ onOpenSampling }: Props) {
             label={t("presets.panel.coloredDialogue.label")}
             hint={t("presets.panel.coloredDialogue.hint")}
           />
+          <Toggle
+            id="response-dialogue-focus"
+            checked={s.dialogueFocus ?? true}
+            onChange={(dialogueFocus) => persistGlobal({ dialogueFocus })}
+            label={t("presets.panel.dialogueFocus.label")}
+            hint={t("presets.panel.dialogueFocus.hint")}
+          />
         </div>
       </div>
 

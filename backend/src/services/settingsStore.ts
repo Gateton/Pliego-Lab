@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   density: "comfortable",
   outputLanguage: "",
   coloredDialogue: true,
+  dialogueFocus: true,
   favoriteCharacterIds: [],
   onboardingWizardVersion: null,
   onboardingTourVersion: null,

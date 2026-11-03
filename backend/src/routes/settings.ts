@@ -22,6 +22,7 @@ settingsRouter.put("/", async (req, res) => {
     density,
     outputLanguage,
     coloredDialogue,
+    dialogueFocus,
     favoriteCharacterIds,
   } = req.body as Record<string, unknown>;
 
@@ -42,6 +43,7 @@ settingsRouter.put("/", async (req, res) => {
     density: density === "compact" ? "compact" : "comfortable",
     outputLanguage: typeof outputLanguage === "string" ? outputLanguage.slice(0, 40) : "",
     coloredDialogue: typeof coloredDialogue === "boolean" ? coloredDialogue : true,
+    dialogueFocus: typeof dialogueFocus === "boolean" ? dialogueFocus : true,
     favoriteCharacterIds: Array.isArray(favoriteCharacterIds)
       ? favoriteCharacterIds.filter((id): id is string => typeof id === "string")
       : [],

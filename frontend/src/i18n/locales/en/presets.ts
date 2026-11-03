@@ -40,6 +40,10 @@ export const presets = {
       label: "Colored dialogue",
       hint: "Asks the model for a fixed color for each character.",
     },
+    dialogueFocus: {
+      label: "Long, dialogue-driven replies",
+      hint: "Asks for long replies told mostly through dialogue, with little narration between the lines.",
+    },
     blocks: {
       withPreset: "Blocks — {name}",
       global: "Global blocks",
