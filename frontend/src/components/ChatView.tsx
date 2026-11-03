@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Brain, MessagesSquare, Pencil, ScanSearch, Shirt } from "lucide-react";
+import { ArrowDown, Brain, MessagesSquare, Pencil, ScanSearch, Shirt } from "lucide-react";
 import type { Chat } from "../types/chat";
 import type { CharacterCard } from "../types/character";
 import type { Persona } from "../types/persona";
@@ -22,6 +22,7 @@ import { ActiveMemoryPanel } from "./memory/ActiveMemoryPanel";
 import { ChatOptionsMenu } from "./chat/ChatOptionsMenu";
 import { FirstStepsCard, type FirstStepsState } from "./onboarding/FirstStepsCard";
 import { useActiveMemory } from "../hooks/useActiveMemory";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 import { useT } from "../i18n";
 import * as lorebooksApi from "../api/lorebooks";
 import type { Lorebook, LorebookScanResult } from "../types/lorebook";
@@ -154,6 +155,7 @@ export function ChatView({
   const [loreInspectorOpen, setLoreInspectorOpen] = useState(false);
   const [loreTrace, setLoreTrace] = useState<LorebookScanResult | null>(null);
   const [loreScanning, setLoreScanning] = useState(false);
+  const thread = useStickToBottom(chat?.id ?? null);
   const { personas } = usePersonas();
   const { settings, update } = useSettings();
   const activeMemory = useActiveMemory(chatId);
@@ -442,8 +444,9 @@ export function ChatView({
         </div>
       )}
 
-      <div className="chat-scroll flex-1 overflow-y-auto px-6 py-4" data-tour="chat-thread">
-        <div className="chat-thread">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={thread.containerRef} className="chat-scroll flex-1 overflow-y-auto px-6 py-4" data-tour="chat-thread">
+        <div ref={thread.contentRef} className="chat-thread">
         {chat.messages.length === 0 && (
           <div className="chat-empty min-h-[50vh]">
             <div className="chat-empty__card">
@@ -510,6 +513,19 @@ export function ChatView({
           </p>
         )}
         </div>
+      </div>
+      {!thread.atBottom && (
+        <button
+          type="button"
+          onClick={() => thread.scrollToBottom(true)}
+          title={t("chat.thread.scrollToBottom")}
+          aria-label={t("chat.thread.scrollToBottom")}
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-text shadow-lg transition-colors hover:border-accent hover:text-accent"
+        >
+          <ArrowDown size={14} />
+          {t("chat.thread.scrollToBottom")}
+        </button>
+      )}
       </div>
 
       <Composer

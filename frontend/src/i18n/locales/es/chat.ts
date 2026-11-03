@@ -18,6 +18,7 @@ export const chat = {
   },
   /** The message thread: its empty state, the NPC filter banner and the stream error line. */
   thread: {
+    scrollToBottom: "Ir al final",
     emptyTitle: "La escena está en silencio.",
     emptyBody: "Escribí el primer mensaje. No hace falta que sea perfecto, solo que abra una puerta.",
     /** Wraps the `@Name` span: the name is rendered as its own element between both halves. */

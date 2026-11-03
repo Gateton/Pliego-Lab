@@ -9,6 +9,7 @@ export const chat = {
     body: "Pick a character from your library or open one of your recent chats to get back to the scene.",
   },
   thread: {
+    scrollToBottom: "Jump to latest",
     emptyTitle: "The scene is silent.",
     emptyBody: "Write the first message. It doesn't have to be perfect, it just has to open a door.",
     filterPrefix: "Showing only appearances of ",
