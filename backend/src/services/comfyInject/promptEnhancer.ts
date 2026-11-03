@@ -5,20 +5,23 @@
 
 const QUALITY_LADDER = ["masterpiece", "best quality", "amazing quality", "very aesthetic", "absurdres", "highres"];
 
-// keyword → lighting tags, tested against the whole (lowercased) prompt.
+// tag → lighting tags. Matched against WHOLE tags (never substrings: "soft" inside "soft skin" or
+// "glowing" inside "glowing eyes" is not a mood), and only consulted when the prompt carries no
+// lighting at all — a prompt that already lit its scene must not get a second, contradicting light.
+// Weather comes before time of day so a rainy night is not lit like a clear one, and every value is
+// lighting only: scenery such as a starry sky would contradict the setting the prompt describes.
 const MOOD_LIGHTING: [RegExp, string][] = [
-  [/\b(tense|tension|danger|threat|threatening)\b/i, "dramatic lighting, high contrast, hard shadows"],
-  [/\b(horror|scary|terrifying|dread|nightmare)\b/i, "dim lighting, deep shadows, cold blue light"],
-  [/\b(combat|battle|fight|fighting|action)\b/i, "dynamic lighting, high contrast, motion blur"],
-  [/\b(tender|intimate|romantic|gentle|soft|caring)\b/i, "soft warm light, low contrast, soft lighting"],
-  [/\b(grief|sad|sorrow|mourning|tears)\b/i, "muted tones, cool light, desaturated"],
-  [/\b(triumph|victory|heroic|glorious)\b/i, "dramatic lighting, bold contrast, low angle"],
-  [/\b(magical|arcane|mystic|enchanted|glowing)\b/i, "magical glow, runic light, unnatural color tint"],
-  [/\b(night|midnight|darkness|moonlight|nocturnal)\b/i, "moonlight, starry sky, lamplight, deep shadows"],
-  [/\b(dawn|sunrise)\b/i, "orange glow, long shadows, cool tones"],
-  [/\b(dusk|sunset)\b/i, "sunset sky, orange-pink clouds, golden hour"],
-  [/\b(rain|storm|thunderstorm|thunder|lightning)\b/i, "rain, wet, dramatic lighting, overcast"],
+  [/^(?:rain|heavy rain|storm|thunderstorm|lightning|overcast)$/i, "overcast, dim lighting"],
+  [/^(?:horror|dark|darkness)$/i, "dim lighting, deep shadows"],
+  [/^(?:fighting|battle|combat)$/i, "dramatic lighting, high contrast"],
+  [/^(?:night|midnight|moonlight)$/i, "moonlight, dim lighting"],
+  [/^(?:dawn|sunrise)$/i, "sunrise, soft lighting"],
+  [/^(?:dusk|sunset|evening)$/i, "sunset, golden hour"],
+  [/^(?:romantic|intimate)$/i, "soft lighting, warm lighting"],
+  [/^(?:crying|tears|sad)$/i, "soft lighting, muted colors"],
 ];
+
+const HAS_LIGHTING_RE = /\b(?:light|lighting|lit|lamplight|torchlight|candlelight|moonlight|sunlight|backlighting|shadow|shadows|glow|golden hour|neon)\b/i;
 
 function dedupe(tags: string[]): string[] {
   const seen = new Set<string>();
@@ -39,11 +42,11 @@ function ensureQuality(tags: string[]): string[] {
 }
 
 function applyLighting(tags: string[]): string[] {
-  const joined = tags.join(", ").toLowerCase();
-  const lighting = MOOD_LIGHTING.find(([re]) => re.test(joined))?.[1];
-  if (!lighting) return tags;
-  const already = lighting.split(", ").some((l) => joined.includes(l.toLowerCase()));
-  return already ? tags : [...tags, lighting];
+  if (tags.some((tag) => HAS_LIGHTING_RE.test(tag))) return tags;
+  for (const [re, lighting] of MOOD_LIGHTING) {
+    if (tags.some((tag) => re.test(tag.trim()))) return [...tags, lighting];
+  }
+  return tags;
 }
 
 export function enhancePrompt(prompt: string): string {

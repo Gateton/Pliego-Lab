@@ -2,6 +2,13 @@
 // at narratively appropriate moments. ComfyInject then renders those tags as images.
 import { completeChat, type GenerationMeta, type SamplingParams } from "./llm.js";
 import type { CharacterVisualState, DirectorStateUpdate, ImageDirectorSettings } from "../types.js";
+import { sanitizeImageMarker, sanitizeImageMarkers, sanitizeTagList } from "./directorTags.js";
+
+/** Identity tags are copied verbatim into every image, so a negation in them ("no scars") would be
+ * drawn in every image too. They are cleaned before the Director ever sees them. */
+function cleanIdentityTags(tags: string): string {
+  return sanitizeTagList(tags).tags.join(", ");
+}
 
 const ENHANCED_SYSTEM_PROMPT = `You are an image director for a roleplay story. Your ONLY job: read the text and insert [[IMG:...]] tags at the best visual moments.
 
@@ -16,6 +23,8 @@ Identify the MAIN VERB of the scene — what is actually happening — and make 
   "she kisses her" → 1girl, leaning in, kissing, eyes closed, close to another's face, female lips against hers (ONE 1girl block — the partner is a body-part reference, never a second block). Consider POV from the kissed character's perspective if it fits the beat. Same logic for any pairing — swap the gender word for whoever the actual partner is, and swap the acting/receiving roles freely; never assume from the example's wording.
   "he slams the table" → fist on table, leaning forward
 
+PICK VISUAL MOMENTS, NOT LINES OF DIALOGUE: place an image where the body, the contact or the place CHANGES (she kneels, he grabs her wrist, they enter the tavern, she takes off the dress). A long stretch of conversation is ONE moment: show the speaker's posture and expression there, not one image per line. The tags show the scene EXACTLY at the point where the marker sits — the clothing, posture and position the text has reached by then, never what happens later or what was true earlier.
+
 ══════════════════════════════════════════
 TWO CHARACTERS IN INTERACTION
 ══════════════════════════════════════════
@@ -25,22 +34,24 @@ If you genuinely need BOTH participants' faces/expressions shown in independent 
 The "one character per image" rule applies ONLY when the scene has ONE character involved in the action.
 
 ══════════════════════════════════════════
-TAG CONTENT (every tag includes, in this order)
+TAG CONTENT — ORDER IS PRIORITY
 ══════════════════════════════════════════
-- Quality: masterpiece, best quality, highres, anime, anime coloring
-- Rating: rating:safe | rating:questionable | rating:explicit
+The image model gives the MOST weight to the FIRST tags and the least to the last ones. What is HAPPENING must come early, the background last:
+- Quality: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring
+- Rating: rating:safe | rating:questionable | rating:explicit — must match the clothing state (nude/see-through/sexual → questionable or explicit)
 - Count: exactly ONE 1girl or 1boy, matching whoever the shot is about — never assume male by default, and never a second count tag for a partner (see TWO CHARACTERS IN INTERACTION)
-- Appearance: hair, eyes, body — from CHARACTER CONTEXT below (fixed identity, copy it as-is, never re-invented from the scene)
-- Outfit: from CHARACTER CONTEXT / current visual state
-- Scene: lighting + 2-3 location details + time of day
-- Pose/action: the verb from the prose
-- Expression: the character's emotion
+- Identity: hair, eyes, species, body — from CHARACTER CONTEXT below (fixed identity, copy it as-is, never re-invented from the scene)
+- ACTION / POSE: the verb from the prose at THIS exact point, plus contact with the partner
+- Expression + gaze: the visible emotion, and ONE gaze direction
+- Clothing state: from the current visual state / prose
+- Framing: one camera tag that agrees with SHOT
+- Setting + lighting: 3-5 tags, last
 
 ══════════════════════════════════════════
 SHOT · AR · SEED
 ══════════════════════════════════════════
 SHOT: CLOSE (face/emotion), MEDIUM (torso/action), DUTCH (chaos), OVERHEAD (vulnerable), LOWANGLE (power), HIGHANGLE (weak). Intimate scenes → CLOSE or MEDIUM. Never repeat the same SHOT consecutively.
-AR: PORTRAIT (2:3), SQUARE (1:1), LANDSCAPE (4:3 or 16:9), CINEMA (21:9).
+AR: PORTRAIT (2:3), SQUARE (1:1), LANDSCAPE (4:3 or 16:9), CINEMA (21:9). The marker is ALWAYS "tags | AR | SHOT | SEED": the second field is an AR token, never a SHOT token.
 SEED: RANDOM (new scene), LOCK (same character+scene), <integer> (match previous).
 
 ══════════════════════════════════════════
@@ -65,28 +76,35 @@ const RICH_TAGS_PROMPT = `
 ══════════════════════════════════════════
 TAG RICHNESS — FULL TAG CHAIN REQUIRED
 ══════════════════════════════════════════
-Every image MUST carry a full tag chain in this order:
+Every image MUST carry a full tag chain in THIS order — earlier tags weigh more in the image model, so the action is never buried behind the background:
 [1] QUALITY: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring
 [2] RATING: rating:safe | rating:questionable | rating:explicit
-[3] COUNT: 1girl (solo) or 1girl, 1boy (couple)
-[4] HAIR: color + length + style + bangs + accessories, then state (wet, disheveled, wind-blown)
-[5] EYES: color + shape + direction
-[6] FACE: shape + nose + lips + brows + lashes
-[7] SKIN/BODY: tone + type + bust + permanent marks, then state (sweat, flushed, wet, blood, bruised)
-[8] SPECIES: non-humans only (elf ears, horns, tail, wings, animal ears)
-[9] OUTFIT: each garment = color + material + garment (+ state), outermost → innermost. NUDE → "nude" + only retained accessories.
-[10] SCENE: mood + lighting, 3-5 location details, objects, time of day
-[11] POSE: the verb from the prose
-[12] EXPRESSION: keyword + state
+[3] COUNT: 1girl or 1boy, then "solo" when nobody else is in frame, or "solo focus" when only body parts of a partner are visible
+[4] IDENTITY: hair color + length + style + bangs, eye color, skin tone, body type + bust size, species traits (elf ears, horns, tail, animal ears), permanent marks — copied from IDENTITY ANCHORS. 5-9 tags.
+[5] ACTION / POSE: what the body is doing at THIS point of the text — posture (kneeling, straddling, leaning forward…), what the hands do (hand on own chest, holding cup…), contact with the partner (male hand on her hip, hug from behind…). 4-7 tags. THIS is what the image is about.
+[6] EXPRESSION + GAZE: visible face only (blush, tears, smile, open mouth, frown, wide-eyed, half-closed eyes, clenched teeth) + ONE gaze tag (looking at viewer | looking down | looking away | looking up | eyes closed). 3-5 tags.
+[7] CONDITION: temporary body state from the ledger/prose (wet, sweat, wet hair, messy hair, torn clothes, bruise, blood). 0-4 tags.
+[8] CLOTHING: each garment = color + garment (material only when visible), outermost → innermost. NUDE → "nude" + only retained accessories. 2-6 tags.
+[9] FRAMING: ONE tag agreeing with SHOT (portrait, upper body, cowboy shot, close-up, from above, from below, from side, from behind, pov).
+[10] SETTING + LIGHT: 2-3 location tags + 1-2 lighting tags + time of day. 3-6 tags.
 
-Tag richness: 4-8 tags per major slot. NEVER sparse (2-3 tags total = generic image = FAILED).
+IDENTITY FIRST: slot [4] is this character's FIXED physical identity — copy from IDENTITY ANCHORS / CHARACTER CONTEXT AS-IS when given, never re-invented from the current scene. Slots [5]-[10] are the opposite: fully scene-dependent, decided fresh from THIS beat, never carried over from identity.
 
-IDENTITY FIRST: slots [4]-[8] are this character's FIXED physical identity — copy from IDENTITY ANCHORS / CHARACTER CONTEXT AS-IS when given, never re-invented from the current scene. Slots [10]-[12] are the opposite: fully scene-dependent, decided fresh from THIS beat, never carried over from identity.
+When a NAMED character appears in the image, emit their FULL chain [1]-[10] — never a partial placeholder like "1girl, sitting".
 
-When a NAMED character appears in the image, emit their FULL chain [1]-[12] — never a partial placeholder like "1girl, sitting".
+══════════════════════════════════════════
+IMAGE-MODEL LANGUAGE — the image model only understands real Danbooru tags
+══════════════════════════════════════════
+- Every tag is a REAL Danbooru tag or a short concrete visual phrase of 1-4 words (blonde hair, kneeling, hand on own cheek, wet clothes). Never sentences, never narrative or abstract ideas.
+- Translate feelings into what the FACE and BODY show. "glimmer of hope", "waiting for orders", "lost look", "vacant gaze", "desperate", "searching expression" mean NOTHING to the image model → use "empty eyes", "teary eyes", "slight smile", "looking up", "trembling", "parted lips".
+- Never write negations or absences: no "no X", "without X", "removed X", "not wearing X" — the model draws the X. Describe what IS there instead ("nude", "topless", "barefoot"). Only exceptions, as they are real Danbooru tags: "no bra", "no panties".
+- One tag per concept, no synonyms stacked: "large breasts" — not also "DD cup breasts", "big breasts"; "wet hair" — not also "soaking wet hair", "dripping hair", "drenched hair".
+- No contradictions inside one image: one gaze, one camera angle, one posture, one time of day, one lighting mood.
+- Name the partner only through body parts (male hand, male torso, faceless male) — never a name, never a second count tag.
+- Tags in English, words separated by spaces, never underscores.
 
-EXAMPLE (full chain, one character — partner as body-part reference only, never a second block):
-masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:explicit, 1girl, long black hair, straight bangs, red eyes, parted lips, flushed cheeks, pale skin, medium breast, thighhighs, black lace choker, bedroom, warm lamplight, rumpled sheets, wooden headboard, night, soft warm light, straddling, cowgirl position, hands on male chest, male hands on her hips, body contact, aroused, half-closed eyes, heavy breathing, body sweat
+EXAMPLE (full chain in the right order — one character, partner only as body parts):
+masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:explicit, 1girl, long black hair, straight bangs, red eyes, pale skin, slim, medium breasts, straddling, cowgirl position, hands on male chest, male hands on hips, leaning forward, blush, half-closed eyes, open mouth, looking at viewer, sweat, messy hair, nude, black choker, thighhighs, cowboy shot, bedroom, rumpled sheets, night, warm lamplight
 
 ══════════════════════════════════════════
 CLOTHING / NUDITY STATE — MANDATORY IN EVERY IMAGE
@@ -109,7 +127,7 @@ CONSISTENCY — same beat = same state:
 const VISUAL_STATE_RULES = `- Add one entry to "stateUpdates" per character whose CLOTHING or visual STATE (wet, injured, dirty, torn, bruised, etc.) changed THIS turn. If nobody's state changed, "stateUpdates" must be [].
 - BASELINE INITIALIZATION (separate from the rule above): any character who speaks, acts, or is described THIS turn and has NO entry yet in "## CURRENT VISUAL STATE" above (or that section is entirely absent) MUST get a "stateUpdates" entry establishing their starting outfit RIGHT NOW — this is not a "change" (there was nothing before), it's the first record. Infer it from what the text/scene actually shows; if truly nothing is specified, default to "nude" plus any explicitly-mentioned worn accessory. Set "outfitChanged": true for this entry regardless — from the ledger's perspective going from no-record to a-record IS the thing that has to be written. Never leave a character who appears on-screen with no outfit record at all.
 - Losing clothing (fully or partially) is an OUTFIT change, NEVER a state tag: set "outfitChanged": true and "newOutfit": "nude" (+ any retained accessories, e.g. "nude, collar"), or the exact remaining garments for partial undress. Do NOT put "nude" in "stateAdded" — an outfit-only update with "stateAdded": [] is correct and expected.
-- "newOutfit" PURITY: it must be a PURE garment tag list, same format/rules as OUTFIT slot [9] elsewhere (color+material+garment, outermost→innermost) — NEVER prose, NEVER a parenthetical explanation of why it changed (no "(removed X per house rule)" or similar). NEVER reference, in any form, a garment that is NOT currently worn — no "removed X", no "no longer wearing X", no negation of any kind. If something was taken off and nothing replaces it, use the PARTIAL NUDITY BY REGION convention ("topless"/"bottomless" — see OUTFIT rules above) or "nude" for full nudity — describe what IS there, never the absence of what was. This is NOT optional: if the upper OR lower body ends up with nothing on it while the other half stays covered, "newOutfit" MUST explicitly include "topless" or "bottomless" — leaving that region out of the tag list entirely (instead of naming it bare) is itself a bug, since a later turn reading this ledger back has no way to know that region is bare.
+- "newOutfit" PURITY: it must be a PURE garment tag list, same format/rules as CLOTHING slot [8] elsewhere (color+material+garment, outermost→innermost) — NEVER prose, NEVER a parenthetical explanation of why it changed (no "(removed X per house rule)" or similar). NEVER reference, in any form, a garment that is NOT currently worn — no "removed X", no "no longer wearing X", no negation of any kind. If something was taken off and nothing replaces it, use the PARTIAL NUDITY BY REGION convention ("topless"/"bottomless" — see OUTFIT rules above) or "nude" for full nudity — describe what IS there, never the absence of what was. This is NOT optional: if the upper OR lower body ends up with nothing on it while the other half stays covered, "newOutfit" MUST explicitly include "topless" or "bottomless" — leaving that region out of the tag list entirely (instead of naming it bare) is itself a bug, since a later turn reading this ledger back has no way to know that region is bare.
 - "stateAdded"/"stateRemoved" are ONLY for durable physical/appearance conditions that persist across turns without a narrative event changing them (wet, dirty, injured, bruised, tear-streaked face, disheveled hair, sweat, a blush that lingers, etc.) — never personality or behavior tags, never clothing/nudity (that's outfitChanged/newOutfit), and NEVER current pose/activity/action (standing, cooking, carrying something, sitting, walking) — those are derived fresh per image from THIS turn's text via the normal pose tag and must never be stored in the ledger. Also never an accessory-ABSENCE tag ("uncollared", "bare neck") — same rule as clothing: if it's not worn, don't mention it anywhere.
 - ACTIVE REVIEW, not just append: every turn, reconsider EVERY tag already on a character's ledger, not only what's new. If a condition has resolved, is no longer contextually true, or was never a durable condition to begin with (see scope above — e.g. a leftover pose/activity tag), put it in "stateRemoved". Only ever adding and never removing is a FAILED update.`;
 
@@ -118,7 +136,7 @@ const PERSISTENT_STATE_PROMPT = `
 OUTPUT FORMAT — JSON MODE (overrides the plain-text output format above)
 ══════════════════════════════════════════
 Return ONLY a JSON object — no markdown fences, no prose outside it — in this exact shape:
-{"taggedText": "<the full text with [[IMG:...]] tags inserted, following every rule above unchanged>", "stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same OUTFIT format as slot [9]>", "stateAdded": ["..."], "stateRemoved": ["..."]}]}
+{"taggedText": "<the full text with [[IMG:...]] tags inserted, following every rule above unchanged>", "stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same CLOTHING format as slot [8]>", "stateAdded": ["..."], "stateRemoved": ["..."]}]}
 
 - "taggedText" is the SAME output you would otherwise return as plain text — nothing about the tag-writing rules changes, only the envelope.
 ${VISUAL_STATE_RULES}
@@ -131,7 +149,7 @@ function buildVisualStateCheckSystemPrompt(): string {
   return `You are auditing the persistent visual-state ledger for an ongoing roleplay scene. Read the text below together with the character/NPC/persona context and the current "## CURRENT VISUAL STATE" ledger, and verify every character's outfit/state is accurate — correct anything wrong, missing, or stale.
 You are NOT writing any [[IMG:...]] image tags. This is a standalone accuracy pass over the state ledger only, completely separate from image generation.
 Return ONLY a JSON object — no markdown fences, no prose outside it — in this exact shape:
-{"stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same OUTFIT format as slot [9] elsewhere>", "stateAdded": ["..."], "stateRemoved": ["..."]}]}
+{"stateUpdates": [{"character": "<exact name>", "outfitChanged": <bool>, "newOutfit": "<only when outfitChanged=true — the FULL new outfit, same CLOTHING format as slot [8] elsewhere>", "stateAdded": ["..."], "stateRemoved": ["..."]}]}
 ${VISUAL_STATE_RULES}
 If nothing needs correcting, return {"stateUpdates": []}.`;
 }
@@ -158,8 +176,8 @@ function buildMinTagsPrompt(minTags: number): string {
 ══════════════════════════════════════════
 MINIMUM TAG COUNT — HARD REQUIREMENT
 ══════════════════════════════════════════
-Every [[IMG:...]] tag chain MUST contain AT LEAST ${minTags} comma-separated tags — count them before closing the marker. Fewer than ${minTags} = sparse, generic, FAILED image.
-If you're short, add MORE specific detail to SCENE/HAIR/FACE/OUTFIT/POSE/EXPRESSION (per-strand hair detail, fabric texture, background props, lighting nuance) — never pad with vague filler words.`;
+Every [[IMG:...]] tag chain MUST contain AT LEAST ${minTags} and AT MOST ${minTags + 15} comma-separated tags — count them before closing the marker.
+If you're short, add more CONCRETE visible detail to ACTION/POSE first (hands, contact, posture), then CLOTHING and SETTING (garment colors, props in frame). NEVER reach the count with invented phrases, abstract feelings, synonyms of a tag already present or negations — one wrong tag hurts the image more than one missing tag.`;
 }
 
 function buildUserPrompt(text: string, maxImages: number, minTags: number): string {
@@ -172,7 +190,7 @@ Output the FULL text with tags added. Do NOT modify the narration.
 
 EXAMPLE:
 Input: "The knight drew his sword. The dragon roared, flames shooting from its jaws."
-Output: "The knight drew his sword. [[IMG: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:safe, 1girl, medium breast, silver armor, plate armor, gauntlet, helmet, castle gate, stone walls, torchlight, dramatic lighting, high contrast, drawing sword, sword raised, determined, jaw set, narrowed eyes | PORTRAIT | MEDIUM | RANDOM]] The dragon roared, flames shooting from its jaws. [[IMG: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:safe, 1girl, red scales, dragon form, sharp teeth, claws, tail, wings spread, volcanic landscape, dark sky, lava glow, smoke, dramatic lighting, fire breath, low angle, open jaw, angry eyes | LANDSCAPE | LOWANGLE | RANDOM]]"
+Output: "The knight drew his sword. [[IMG: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:safe, 1boy, solo, short brown hair, blue eyes, muscular, drawing sword, holding sword, sword raised, fighting stance, determined, clenched teeth, looking ahead, silver armor, plate armor, gauntlets, cowboy shot, castle gate, stone walls, torchlight, night | PORTRAIT | MEDIUM | RANDOM]] The dragon roared, flames shooting from its jaws. [[IMG: masterpiece, best quality, amazing quality, very aesthetic, absurdres, highres, anime, anime coloring, rating:safe, no humans, dragon, red scales, horns, wings spread, open mouth, fire breathing, sharp teeth, claws, from below, volcano, lava, smoke, dark sky, dramatic lighting | LANDSCAPE | LOWANGLE | RANDOM]]"
 ${minTagsReminder}
 Now insert tags into this text:
 
@@ -252,7 +270,7 @@ function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings
     if (c.description) charParts.push(`Description: ${c.description}`);
     if (c.personality) charParts.push(`Personality: ${c.personality}`);
     if (c.scenario) charParts.push(`Scenario: ${c.scenario}`);
-    if (c.imageTags) charParts.push(`Visual appearance (Danbooru tags): ${c.imageTags}`);
+    if (cleanIdentityTags(c.imageTags ?? "")) charParts.push(`Visual appearance (Danbooru tags): ${cleanIdentityTags(c.imageTags)}`);
     if (charParts.length > 0) {
       parts.push(`## CHARACTER CONTEXT\n${charParts.join("\n")}`);
     }
@@ -264,13 +282,14 @@ function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings
   // already follows — deciding WHETHER this turn needs it is left to PARTNER IDENTITY & SCOPE,
   // not pre-filtered here.
   if (settings.includePersonaContext && ctx.persona?.imageTags) {
-    parts.push(`## PERSONA CONTEXT\nName: ${ctx.persona.name}\nVisual appearance (Danbooru tags): ${ctx.persona.imageTags}`);
+    parts.push(`## PERSONA CONTEXT\nName: ${ctx.persona.name}\nVisual appearance (Danbooru tags): ${cleanIdentityTags(ctx.persona.imageTags)}`);
   }
 
   // NPC Tracker context (always included when there are tracked NPCs).
   if (ctx.npcs && ctx.npcs.length > 0) {
     const npcLines = ctx.npcs.map((npc) => {
       const fields = Object.entries(npc.values)
+        .map(([k, v]) => [k, k === "imageTags" && v ? cleanIdentityTags(v) : v] as const)
         .filter(([, v]) => v)
         .map(([k, v]) => `${k}: ${v}`)
         .join(" | ");
@@ -302,13 +321,13 @@ function buildContextBlock(ctx: DirectorContext, settings: ImageDirectorSettings
   // Always on (not gated by any toggle) — an untethered identity is never the desired behavior.
   {
     const anchors: string[] = [];
-    if (ctx.character?.name && ctx.character.imageTags) {
+    if (ctx.character?.name && cleanIdentityTags(ctx.character.imageTags ?? "")) {
       anchors.push(
-        `- ${ctx.character.name}: copy these identity tags (hair/eyes/face/skin) AS-IS, as a single block right after COUNT — do not spread them out, invent them or change them unless the prose explicitly says so this turn: ${ctx.character.imageTags}`,
+        `- ${ctx.character.name}: copy these identity tags (hair/eyes/face/skin) AS-IS, as a single block right after COUNT — do not spread them out, invent them or change them unless the prose explicitly says so this turn: ${cleanIdentityTags(ctx.character.imageTags)}`,
       );
     }
     for (const npc of ctx.npcs ?? []) {
-      const imageTags = npc.values["imageTags"];
+      const imageTags = cleanIdentityTags(npc.values["imageTags"] ?? "");
       if (!imageTags) continue;
       anchors.push(
         `- ${npc.name}: copy these identity tags (hair/eyes/face/skin) AS-IS, as a single block right after COUNT — do not spread them out, invent them or change them unless the prose explicitly says so this turn: ${imageTags}`,
@@ -453,6 +472,11 @@ export async function runImageDirector(
       console.warn(`[Image Director] no tags returned. Preview: ${cleaned.slice(0, 300)}`);
       return { taggedText: text, stateUpdates: [], meta, diagnostic };
     }
+    const sanitized = sanitizeImageMarkers(cleaned);
+    cleaned = sanitized.text;
+    if (sanitized.dropped.length > 0) {
+      console.log(`[Image Director] dropped ${sanitized.dropped.length} tag(s) the image model would misread: ${sanitized.dropped.join(" · ")}`);
+    }
     let tags = cleaned.match(/\[\[IMG:[\s\S]*?\]\]/g) ?? [];
     if (tags.length === 0) {
       // hasImgTags was true (the literal substring "[[IMG:" is present) but no COMPLETE tag
@@ -583,5 +607,5 @@ Write the ONE [[IMG:...]] tag chain showing ${npc.name}'s reaction to this momen
   if (!match) {
     throw new Error("The Director did not produce a valid reaction image.");
   }
-  return { marker: match[0], meta };
+  return { marker: sanitizeImageMarker(match[0]).marker, meta };
 }
